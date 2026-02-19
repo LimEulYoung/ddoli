@@ -10,11 +10,11 @@ services:
       - DB_USER=ddoli
       - DB_PASSWORD=ddoli2026
     volumes:
-      - ddoli-claude-auth:/root/.claude
-      - ddoli-chat:/root/chat
-      - ddoli-workspace:/root/workspace
-      - ddoli-papers:/root/papers
-      - ddoli-templates:/root/paper-templates
+      - ddoli-claude-auth:/home/ddoli/.claude
+      - ddoli-chat:/home/ddoli/chat
+      - ddoli-workspace:/home/ddoli/workspace
+      - ddoli-papers:/home/ddoli/papers
+      - ddoli-templates:/home/ddoli/paper-templates
     depends_on:
       db:
         condition: service_healthy

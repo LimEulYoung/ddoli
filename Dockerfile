@@ -18,6 +18,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Claude CLI 설치
 RUN npm install -g @anthropic-ai/claude-code
 
+# 일반 유저 생성 (Claude CLI가 root에서 --dangerously-skip-permissions 불가)
+RUN useradd -m -s /bin/bash ddoli
+
 # 작업 디렉토리
 WORKDIR /app
 
@@ -28,8 +31,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 앱 소스
 COPY . .
 
-# 데이터 디렉토리 생성
-RUN mkdir -p /root/chat /root/workspace /root/papers /root/paper-templates /tmp/ddoli-attachments uploads
+# 데이터 디렉토리 생성 (ddoli 유저 소유)
+RUN mkdir -p /home/ddoli/chat /home/ddoli/workspace /home/ddoli/papers /home/ddoli/paper-templates /home/ddoli/.claude /tmp/ddoli-attachments uploads \
+    && chown -R ddoli:ddoli /home/ddoli /tmp/ddoli-attachments /app
+
+USER ddoli
 
 EXPOSE 8000
 
