@@ -2,6 +2,8 @@
 
 Mobile-friendly Claude Code web client: Browser → FastAPI → Claude CLI (local) → SSE streaming.
 
+**Repository**: https://github.com/LimEulYoung/ddoli
+
 ## Tech Stack
 
 - **Backend**: Python 3.12, FastAPI, PostgreSQL (psycopg2), sse-starlette, openai (Upstage Solar)
