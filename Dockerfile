@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     texlive-latex-base \
     texlive-latex-extra \
-    texlive-lang-korean \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js (for Claude CLI + MCP stdio server)
