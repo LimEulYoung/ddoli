@@ -40,12 +40,13 @@ COPY . .
 RUN mkdir -p /home/ddoli/chat /home/ddoli/workspace /home/ddoli/papers /home/ddoli/paper-templates /home/ddoli/.claude /tmp/ddoli-attachments uploads \
     && chown -R ddoli:ddoli /home/ddoli /tmp/ddoli-attachments /app
 
-# 기본 논문 템플릿 (basic)
-COPY paper-templates/ /home/ddoli/paper-templates/
-RUN chown -R ddoli:ddoli /home/ddoli/paper-templates
+# 기본 논문 템플릿을 별도 경로에 보관 (볼륨 마운트 시 덮어쓰기 방지)
+COPY paper-templates/ /opt/default-templates/
+RUN chown -R ddoli:ddoli /opt/default-templates
 
 USER ddoli
 
 EXPOSE 8000
 
-CMD ["bash", "-c", "google-chrome --headless --disable-gpu --no-sandbox --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 & python main.py"]
+# 시작 시: 템플릿이 비어있으면 기본 템플릿 복사 → Chrome headless 시작 → 앱 실행
+CMD ["bash", "-c", "cp -rn /opt/default-templates/* /home/ddoli/paper-templates/ 2>/dev/null; google-chrome --headless --disable-gpu --no-sandbox --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 & python main.py"]
