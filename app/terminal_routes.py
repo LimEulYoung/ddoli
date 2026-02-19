@@ -1,6 +1,6 @@
 """
-터미널 모드 - WebSocket 기반 로컬 PTY 터미널
-pty + subprocess로 로컬 셸 연결, WebSocket으로 양방향 스트리밍
+Terminal mode - WebSocket-based local PTY terminal
+Connects to a local shell via pty + subprocess, with bidirectional streaming over WebSocket
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -18,16 +18,16 @@ import uuid
 
 router = APIRouter()
 
-# 활성 터미널 세션 추적
+# Active terminal session tracking
 terminal_sessions: dict[str, dict] = {}
-# 최대 동시 터미널 세션 수
+# Maximum concurrent terminal sessions
 MAX_TERMINALS = 3
-# 비활성 타임아웃 (초)
-IDLE_TIMEOUT = 600  # 10분
+# Idle timeout (seconds)
+IDLE_TIMEOUT = 600  # 10min
 
 
 def _cleanup_idle_sessions():
-    """비활성 터미널 세션 정리"""
+    """Clean up idle terminal sessions"""
     now = time.time()
     to_remove = []
     for sid, session in terminal_sessions.items():
@@ -38,11 +38,11 @@ def _cleanup_idle_sessions():
 
 
 def _close_session(session_id: str):
-    """터미널 세션 종료"""
+    """Close terminal session"""
     session = terminal_sessions.pop(session_id, None)
     if not session:
         return
-    # 자식 프로세스 종료
+    # Terminate child process
     pid = session.get("pid")
     if pid:
         try:
@@ -50,7 +50,7 @@ def _close_session(session_id: str):
             os.waitpid(pid, os.WNOHANG)
         except (ProcessLookupError, ChildProcessError):
             pass
-    # fd 닫기
+    # Close fd
     fd = session.get("fd")
     if fd:
         try:
@@ -60,14 +60,14 @@ def _close_session(session_id: str):
 
 
 def _set_pty_size(fd, rows, cols):
-    """PTY 크기 조정"""
+    """Resize PTY"""
     size = struct.pack("HHHH", rows, cols, 0, 0)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
 
 
 @router.get("/terminal/status")
 async def terminal_status():
-    """터미널 상태 조회"""
+    """Get terminal status"""
     _cleanup_idle_sessions()
     return JSONResponse({
         "active": len(terminal_sessions),
@@ -78,11 +78,11 @@ async def terminal_status():
 
 @router.websocket("/ws/terminal")
 async def websocket_terminal(ws: WebSocket):
-    """WebSocket 터미널 엔드포인트"""
+    """WebSocket terminal endpoint"""
     _cleanup_idle_sessions()
 
     if len(terminal_sessions) >= MAX_TERMINALS:
-        await ws.close(code=1008, reason="최대 터미널 수 초과")
+        await ws.close(code=1008, reason="Maximum terminal limit exceeded")
         return
 
     await ws.accept()
@@ -91,17 +91,17 @@ async def websocket_terminal(ws: WebSocket):
     master_fd = None
 
     try:
-        # PTY + fork (pty.fork가 master/slave 설정을 올바르게 처리)
+        # PTY + fork (pty.fork handles master/slave setup correctly)
         pid, master_fd = pty.fork()
         if pid == 0:
-            # 자식 프로세스 — 셸 실행
+            # Child process — execute shell
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execve(shell, [shell, "--login"], env)
         else:
-            # 부모 프로세스
-            # 세션 등록
+            # Parent process
+            # Register session
             terminal_sessions[session_id] = {
                 "pid": pid,
                 "fd": master_fd,
@@ -109,15 +109,15 @@ async def websocket_terminal(ws: WebSocket):
                 "ws": ws
             }
 
-            # 세션 ID 전달
+            # Send session ID
             await ws.send_json({"type": "session_id", "id": session_id})
 
-            # PTY 초기 크기 설정
+            # Set initial PTY size
             _set_pty_size(master_fd, 24, 80)
 
-            # 양방향 스트리밍
+            # Bidirectional streaming
             async def read_from_pty():
-                """PTY 출력 → WebSocket"""
+                """PTY output → WebSocket"""
                 loop = asyncio.get_event_loop()
                 try:
                     while True:
@@ -139,10 +139,10 @@ async def websocket_terminal(ws: WebSocket):
                 except Exception:
                     pass
 
-            # PTY 읽기 태스크 시작
+            # Start PTY read task
             read_task = asyncio.create_task(read_from_pty())
 
-            # WebSocket 입력 → PTY
+            # WebSocket input → PTY
             try:
                 while True:
                     message = await ws.receive()
@@ -164,7 +164,7 @@ async def websocket_terminal(ws: WebSocket):
                                 continue
                         except (json.JSONDecodeError, ValueError):
                             pass
-                        # 일반 텍스트 입력
+                        # Regular text input
                         if master_fd:
                             os.write(master_fd, message["text"].encode())
 
@@ -183,7 +183,7 @@ async def websocket_terminal(ws: WebSocket):
 
     except Exception as e:
         try:
-            await ws.send_json({"type": "error", "message": f"오류: {str(e)}"})
+            await ws.send_json({"type": "error", "message": f"Error: {str(e)}"})
         except Exception:
             pass
     finally:

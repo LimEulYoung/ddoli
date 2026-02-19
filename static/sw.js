@@ -5,7 +5,7 @@ const STATIC_ASSETS = [
   '/static/manifest.json'
 ];
 
-// 설치 시 정적 파일 캐시
+// Cache static files on install
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 활성화 시 이전 캐시 삭제
+// Delete old caches on activate
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -27,9 +27,9 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 네트워크 우선, 실패 시 캐시
+// Network first, cache on failure
 self.addEventListener('fetch', (event) => {
-  // API 요청은 캐시하지 않음
+  // Don't cache API requests
   if (event.request.url.includes('/chat') ||
       event.request.url.includes('/code') ||
       event.request.url.includes('/stream') ||
@@ -40,7 +40,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // 성공 시 캐시 업데이트
+        // Update cache on success
         if (response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // 오프라인 시 캐시에서 반환
+        // Return from cache when offline
         return caches.match(event.request);
       })
   );

@@ -1,7 +1,7 @@
 """
-Ddoli - Claude Clone 메인 서버
-- FastAPI 앱 진입점
-- 채팅 모드 API (Claude Code CLI 사용)
+Ddoli - Claude Clone main server
+- FastAPI app entry point
+- Chat mode API (using Claude Code CLI)
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, File, UploadFile
@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def ensure_chat_directory():
-    """채팅 디렉토리 생성 확인"""
+    """Ensure chat directory exists"""
     os.makedirs(CHAT_DIR, exist_ok=True)
 
 
@@ -40,27 +40,27 @@ app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# 세션별 락 (동시 메시지 방지)
+# Per-session lock (prevent concurrent messages)
 _session_locks: dict[str, threading.Lock] = {}
 _session_locks_guard = threading.Lock()
 
 def get_session_lock(session_key: str) -> threading.Lock:
-    """세션별 락 반환 (없으면 생성)"""
+    """Return per-session lock (create if not exists)"""
     with _session_locks_guard:
         if session_key not in _session_locks:
             _session_locks[session_key] = threading.Lock()
         return _session_locks[session_key]
 
-# 진행 중인 응답 상태 추적 (chat_handler가 관리)
+# Active response status tracking (managed by chat_handler)
 active_responses = {}
 
-# 채팅 스트리밍 추적
+# Chat streaming tracking
 chat_streams = {}  # {response_id: {"cancelled": bool, "process": ...}}
 
-# 파일 업로드 엔드포인트
+# File upload endpoint
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """파일 업로드 (임시 저장 후 파일ID 반환)"""
+    """Upload file (save temporarily and return file ID)"""
     UPLOAD_DIR.mkdir(exist_ok=True)
     file_id = str(uuid.uuid4())[:8]
     safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', file.filename)
@@ -72,33 +72,33 @@ async def upload_file(file: UploadFile = File(...)):
     return JSONResponse({"fileId": file_id, "fileName": safe_name, "saveName": save_name})
 
 
-# 코드 모드 라우터 등록
+# Register code mode router
 from app.code_routes import router as code_router, active_streams as code_active_streams, code_responses
 from app import code_routes
 code_routes.get_session_lock = get_session_lock
 app.include_router(code_router)
 
-# Paper 모드 라우터 등록
+# Register paper mode router
 from app.paper_routes import router as paper_router, active_paper_streams, paper_responses
 from app import paper_routes
 paper_routes.get_session_lock = get_session_lock
 app.include_router(paper_router)
 
-# 터미널 라우터 등록
+# Register terminal router
 from app.terminal_routes import router as terminal_router
 app.include_router(terminal_router)
 
 
 @app.get("/settings/model")
 async def get_selected_model():
-    """저장된 모델 설정 반환"""
+    """Return saved model setting"""
     model = db.get_setting("selected_model") or "sonnet"
     return JSONResponse({"model": model})
 
 
 @app.put("/settings/model")
 async def save_selected_model(request: Request):
-    """모델 설정 저장"""
+    """Save model setting"""
     data = await request.json()
     model = data.get("model", "sonnet")
     if model not in ("haiku", "sonnet", "opus"):
@@ -109,7 +109,7 @@ async def save_selected_model(request: Request):
 
 @app.get("/mcp/tools")
 async def get_mcp_tools(mode: str = ""):
-    """캐싱된 MCP 도구 목록 반환 (mode 파라미터로 필터링)"""
+    """Return cached MCP tool list (filtered by mode parameter)"""
     result = []
     for server_key, server in MCP_SERVERS.items():
         if mode and mode not in server.get("modes", ["chat", "code", "paper"]):
@@ -126,7 +126,7 @@ async def get_mcp_tools(mode: str = ""):
 
 @app.get("/mcp/settings")
 async def get_mcp_settings():
-    """저장된 MCP 도구 활성 목록 반환"""
+    """Return saved MCP tool enabled list"""
     raw = db.get_setting("enabled_mcp_tools")
     if raw:
         try:
@@ -138,7 +138,7 @@ async def get_mcp_settings():
 
 @app.put("/mcp/settings")
 async def save_mcp_settings(request: Request):
-    """MCP 도구 활성 목록 저장"""
+    """Save MCP tool enabled list"""
     tools = await request.json()
     db.set_setting("enabled_mcp_tools", json.dumps(tools))
     return JSONResponse({"success": True})
@@ -146,7 +146,7 @@ async def save_mcp_settings(request: Request):
 
 @app.get("/mcp/servers")
 async def get_mcp_servers():
-    """등록된 MCP 서버 목록 반환"""
+    """Return registered MCP server list"""
     result = []
     for key, server in MCP_SERVERS.items():
         info = {"key": key, "name": server.get("name", key), "type": server.get("type", "sse"), "modes": server.get("modes", []), "toolCount": len(server.get("tools", []))}
@@ -160,10 +160,10 @@ async def get_mcp_servers():
 
 
 def _build_mcp_server_config(data: dict) -> tuple:
-    """MCP 서버 설정 구성. (config, error_msg) 반환. 오류 시 config=None."""
+    """Build MCP server config. Returns (config, error_msg). config=None on error."""
     server_type = data.get("type", "sse")
     if server_type not in ("sse", "stdio"):
-        return None, "타입은 sse 또는 stdio여야 합니다."
+        return None, "Type must be sse or stdio."
     server_config = {
         "type": server_type,
         "modes": data.get("modes", ["chat", "code", "paper"]),
@@ -171,12 +171,12 @@ def _build_mcp_server_config(data: dict) -> tuple:
     if server_type == "sse":
         url = data.get("url", "").strip()
         if not url:
-            return None, "SSE 서버 URL이 필요합니다."
+            return None, "SSE server URL is required."
         server_config["url"] = url
     else:
         command = data.get("command", "").strip()
         if not command:
-            return None, "명령어가 필요합니다."
+            return None, "Command is required."
         server_config["command"] = command
         server_config["args"] = data.get("args", [])
     return server_config, None
@@ -184,11 +184,11 @@ def _build_mcp_server_config(data: dict) -> tuple:
 
 @app.post("/mcp/servers")
 async def create_mcp_server(request: Request):
-    """MCP 서버 추가"""
+    """Add MCP server"""
     data = await request.json()
     name = data.get("name", "").strip()
     if not name or not re.match(r'^[a-zA-Z0-9_-]+$', name):
-        return JSONResponse({"success": False, "error": "이름은 영문, 숫자, _, -만 허용됩니다."}, status_code=400)
+        return JSONResponse({"success": False, "error": "Name can only contain letters, numbers, _, and -."}, status_code=400)
     server_config, error = _build_mcp_server_config(data)
     if error:
         return JSONResponse({"success": False, "error": error}, status_code=400)
@@ -200,7 +200,7 @@ async def create_mcp_server(request: Request):
 
 @app.put("/mcp/servers/{key}")
 async def edit_mcp_server(key: str, request: Request):
-    """MCP 서버 수정"""
+    """Update MCP server"""
     data = await request.json()
     server_config, error = _build_mcp_server_config(data)
     if error:
@@ -213,16 +213,16 @@ async def edit_mcp_server(key: str, request: Request):
 
 @app.delete("/mcp/servers/{key}")
 async def delete_mcp_server(key: str):
-    """MCP 서버 삭제"""
+    """Delete MCP server"""
     success, message = remove_mcp_server(key)
     if not success:
         return JSONResponse({"success": False, "error": message}, status_code=404)
     return JSONResponse({"success": True, "message": message})
 
 
-# ========== 채팅 HTML 템플릿 ==========
+# ========== Chat HTML template ==========
 def create_chat_response_html(response_id: str, session_id: str, message: str, include_user_message: bool = True) -> str:
-    """채팅 응답 HTML 생성 (코드 모드 스타일, SSE 연결 포함)"""
+    """Generate chat response HTML (code mode style, includes SSE connection)"""
     user_msg_html = render_user_message_html(message) if include_user_message else ""
 
     return f"""{user_msg_html}
@@ -234,7 +234,7 @@ def create_chat_response_html(response_id: str, session_id: str, message: str, i
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
             </div>
-            <span id="status-text-{response_id}">Claude가 생각하고 있어요</span>
+            <span id="status-text-{response_id}">Claude is thinking</span>
             <span id="timer-{response_id}" class="text-claude-text-secondary/60 text-xs">(0s)</span>
         </div>
         <div id="events-{response_id}" class="space-y-2 mb-3"></div>
@@ -243,18 +243,18 @@ def create_chat_response_html(response_id: str, session_id: str, message: str, i
     """
 
 
-# ========== 채팅 API ==========
+# ========== Chat API ==========
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """메인 페이지"""
+    """Main page"""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 
 @app.post("/chat", response_class=HTMLResponse)
 async def chat(message: str = Form(""), session_id: str = Form(""), mcp_tools: str = Form(""), file_map: str = Form(""), model: str = Form("sonnet")):
-    """채팅 메시지 전송"""
+    """Send chat message"""
     response_id, session_id, message = chat_handler(
         session_id, message, mcp_tools, file_map,
         CHAT_DIR, CHAT_SYSTEM_PROMPT,
@@ -265,7 +265,7 @@ async def chat(message: str = Form(""), session_id: str = Form(""), mcp_tools: s
 
 @app.get("/chat/status/{response_id}")
 async def get_chat_status(response_id: str):
-    """진행 중인 채팅 응답 상태 조회"""
+    """Query active chat response status"""
     return JSONResponse(mode_status_response(
         response_id, active_responses, "session_id",
         extra_fields_fn=lambda resp: {
@@ -278,13 +278,13 @@ async def get_chat_status(response_id: str):
 
 @app.get("/chat/active")
 async def get_active_chats(session_id: str = ""):
-    """세션의 진행 중인 응답 ID 목록 조회"""
+    """Query active response ID list for session"""
     return JSONResponse(mode_active_response(active_responses, "session_id", session_id))
 
 
 @app.get("/stream")
 async def stream(id: str = "", start_from: int = 0):
-    """SSE로 AI 응답 스트리밍"""
+    """Stream AI response via SSE"""
     return await mode_stream_sse(
         id, active_responses, chat_streams, start_from,
         extra_events_fn=make_chat_extra_events_fn(),
@@ -293,7 +293,7 @@ async def stream(id: str = "", start_from: int = 0):
 
 
 def _cancel_streams(streams: dict, responses: dict, active_statuses: tuple) -> int:
-    """스트림과 응답을 취소하고 취소된 수 반환"""
+    """Cancel streams and responses, return count of cancelled"""
     cancelled = 0
     for info in list(streams.values()):
         info["cancelled"] = True
@@ -312,7 +312,7 @@ def _cancel_streams(streams: dict, responses: dict, active_statuses: tuple) -> i
 
 @app.post("/stop")
 async def stop_stream(mode: str = Form("chat")):
-    """스트리밍 중단"""
+    """Stop streaming"""
     mode_map = {
         "chat": (chat_streams, active_responses, ("pending", "running")),
         "code": (code_active_streams, code_responses, ("pending", "running")),
@@ -326,21 +326,21 @@ async def stop_stream(mode: str = Form("chat")):
 
 @app.post("/clear")
 async def clear_history(session_id: str = Form("")):
-    """대화 기록 초기화"""
+    """Clear conversation history"""
     if session_id:
         db.delete_session(session_id)
-    return HTMLResponse('<script>document.getElementById("session-title").textContent = "새 대화";</script>')
+    return HTMLResponse('<script>document.getElementById("session-title").textContent = "New Chat";</script>')
 
 
 @app.get("/sessions")
 async def get_sessions(mode: str = "chat"):
-    """세션 목록 조회"""
+    """Query session list"""
     return JSONResponse(db.get_sessions_by_mode(mode))
 
 
 @app.delete("/sessions/{mode}")
 async def delete_all_sessions(mode: str):
-    """모드별 전체 세션 삭제"""
+    """Delete all sessions by mode"""
     db.delete_all_sessions_by_mode(mode)
     return JSONResponse({"success": True})
 
@@ -348,7 +348,7 @@ async def delete_all_sessions(mode: str):
 
 @app.get("/session/{session_id}/messages", response_class=HTMLResponse)
 async def get_session_messages(session_id: str):
-    """세션 메시지 목록 HTML"""
+    """Session message list HTML"""
     if not db.get_session(session_id):
         return HTMLResponse("")
 
@@ -360,7 +360,7 @@ async def get_session_messages(session_id: str):
             message_id = msg.get("id", 0)
             content = msg.get("content", "")
 
-            # 도구 이벤트 파싱 및 렌더링
+            # Parse and render tool events
             events = []
             if msg.get("reasoning"):
                 try:
@@ -369,7 +369,7 @@ async def get_session_messages(session_id: str):
                     pass
             events_html = render_tool_events_html(events)
 
-            # 이벤트에 텍스트가 있으면 content를 별도로 렌더링하지 않음 (중복 방지)
+            # If events contain text, skip rendering content separately (prevent duplication)
             has_text_events = any(evt.get("type") == "text" for evt in events)
             content_html = "" if has_text_events else f'<div class="markdown-body" data-raw="{html_lib.escape(content)}"></div>'
 
@@ -379,7 +379,7 @@ async def get_session_messages(session_id: str):
                     {events_html}
                     {content_html}
                     <div class="flex items-center justify-start gap-1 mt-4">
-                        <button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="전체 복사">
+                        <button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="Copy all">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                         </button>
                     </div>
@@ -392,64 +392,64 @@ async def get_session_messages(session_id: str):
 
 @app.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    """세션 삭제"""
+    """Delete session"""
     db.delete_session(session_id)
     return JSONResponse({"success": True})
 
 
 @app.post("/archive/{mode}/{name}")
 async def toggle_archive(mode: str, name: str):
-    """프로젝트/논문 아카이브 토글"""
+    """Toggle project/paper archive"""
     if mode not in ("code", "paper"):
-        return JSONResponse({"error": "잘못된 모드입니다."}, status_code=400)
+        return JSONResponse({"error": "Invalid mode."}, status_code=400)
     archived = db.archive_mode_project(mode, name)
     return JSONResponse({"success": True, "archived": archived})
 
 
 @app.get("/archived/{mode}")
 async def get_archived(mode: str):
-    """아카이브된 프로젝트/논문 목록"""
+    """List archived projects/papers"""
     if mode not in ("code", "paper"):
-        return JSONResponse({"error": "잘못된 모드입니다."}, status_code=400)
+        return JSONResponse({"error": "Invalid mode."}, status_code=400)
     return JSONResponse(db.get_archived_projects(mode))
 
 
-# ========== 명령어 API ==========
+# ========== Commands API ==========
 
 @app.get("/commands")
 async def get_commands():
-    """명령어 목록 조회"""
+    """Query command list"""
     return JSONResponse(db.get_commands())
 
 
 @app.get("/command/{command_id}")
 async def get_command(command_id: int):
-    """명령어 조회"""
+    """Query command"""
     cmd = db.get_command(command_id)
     if not cmd:
-        return JSONResponse({"error": "명령어를 찾을 수 없습니다"}, status_code=404)
+        return JSONResponse({"error": "Command not found"}, status_code=404)
     return JSONResponse(cmd)
 
 
 @app.get("/command/name/{name}")
 async def get_command_by_name(name: str):
-    """이름으로 명령어 조회"""
+    """Query command by name"""
     cmd = db.get_command_by_name(name)
     if not cmd:
-        return JSONResponse({"error": "명령어를 찾을 수 없습니다"}, status_code=404)
+        return JSONResponse({"error": "Command not found"}, status_code=404)
     return JSONResponse(cmd)
 
 
 @app.post("/command")
 async def create_command(name: str = Form(...), content: str = Form(...)):
-    """명령어 생성"""
-    # 이름 유효성 검사 (영문, 숫자, 하이픈, 언더스코어만)
+    """Create command"""
+    # Name validation (letters, numbers, hyphens, underscores only)
     if not re.match(r'^[a-zA-Z0-9_-]+$', name):
-        return JSONResponse({"error": "명령어 이름은 영문, 숫자, 하이픈, 언더스코어만 사용 가능합니다"}, status_code=400)
+        return JSONResponse({"error": "Command name can only contain letters, numbers, hyphens, and underscores"}, status_code=400)
 
-    # 중복 체크
+    # Duplicate check
     if db.get_command_by_name(name):
-        return JSONResponse({"error": "이미 존재하는 명령어 이름입니다"}, status_code=400)
+        return JSONResponse({"error": "Command name already exists"}, status_code=400)
 
     try:
         cmd = db.create_command(name, content)
@@ -460,27 +460,27 @@ async def create_command(name: str = Form(...), content: str = Form(...)):
 
 @app.put("/command/{command_id}")
 async def update_command(command_id: int, name: str = Form(None), content: str = Form(None)):
-    """명령어 수정"""
+    """Update command"""
     if name and not re.match(r'^[a-zA-Z0-9_-]+$', name):
-        return JSONResponse({"error": "명령어 이름은 영문, 숫자, 하이픈, 언더스코어만 사용 가능합니다"}, status_code=400)
+        return JSONResponse({"error": "Command name can only contain letters, numbers, hyphens, and underscores"}, status_code=400)
 
-    # 이름 변경 시 중복 체크
+    # Duplicate check on name change
     if name:
         existing = db.get_command_by_name(name)
         if existing and existing["id"] != command_id:
-            return JSONResponse({"error": "이미 존재하는 명령어 이름입니다"}, status_code=400)
+            return JSONResponse({"error": "Command name already exists"}, status_code=400)
 
     if db.update_command(command_id, name, content):
         return JSONResponse({"success": True})
-    return JSONResponse({"error": "명령어를 찾을 수 없습니다"}, status_code=404)
+    return JSONResponse({"error": "Command not found"}, status_code=404)
 
 
 @app.delete("/command/{command_id}")
 async def delete_command(command_id: int):
-    """명령어 삭제"""
+    """Delete command"""
     if db.delete_command(command_id):
         return JSONResponse({"success": True})
-    return JSONResponse({"error": "명령어를 찾을 수 없습니다"}, status_code=404)
+    return JSONResponse({"error": "Command not found"}, status_code=404)
 
 
 if __name__ == "__main__":

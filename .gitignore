@@ -5,3 +5,4 @@ __pycache__/
 .env
 uploads/*
 !uploads/.gitkeep
+CLAUDE.md

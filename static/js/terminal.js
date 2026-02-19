@@ -1,10 +1,10 @@
 /**
- * Ddoli - 터미널 (xterm.js + WebSocket)
+ * Ddoli - Terminal (xterm.js + WebSocket)
  * Alpine.js mixin: terminalMixin()
  */
 function terminalMixin() {
     return {
-        // 터미널 상태
+        // Terminal state
         showTerminalModal: false,
         terminalWs: null,
         terminalTerm: null,
@@ -95,7 +95,7 @@ function terminalMixin() {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'error') {
-                            term.writeln('\r\n\x1b[31m오류: ' + data.message + '\x1b[0m');
+                            term.writeln('\r\n\x1b[31mError: ' + data.message + '\x1b[0m');
                         }
                     } catch(e) {
                         term.write(event.data);
@@ -106,13 +106,13 @@ function terminalMixin() {
             ws.onclose = () => {
                 this.terminalConnected = false;
                 if (this.showTerminalModal) {
-                    term.writeln('\r\n\x1b[33m연결이 종료되었습니다.\x1b[0m');
+                    term.writeln('\r\n\x1b[33mConnection closed.\x1b[0m');
                 }
             };
 
             ws.onerror = () => {
                 this.terminalConnected = false;
-                term.writeln('\r\n\x1b[31m연결 오류가 발생했습니다.\x1b[0m');
+                term.writeln('\r\n\x1b[31mConnection error.\x1b[0m');
             };
 
             term.onData(data => {
@@ -168,7 +168,7 @@ function terminalMixin() {
                 this.terminalWs = null;
             }
             this.terminalTerm.clear();
-            this.terminalTerm.writeln('\x1b[33m재연결 중...\x1b[0m');
+            this.terminalTerm.writeln('\x1b[33mReconnecting...\x1b[0m');
             this._connectTerminalWs(this.terminalTerm, this.terminalFitAddon);
         },
 

@@ -1,13 +1,13 @@
 /**
  * Ddoli - Main Application JavaScript
- * Alpine.js 상태 관리 + 공통 유틸리티
+ * Alpine.js state management + common utilities
  */
 
 // ============================================================
-// 공통 유틸리티
+// Common Utilities
 // ============================================================
 
-// BasicAuth URL(user:pass@host)에서 fetch 실패 방지: credentials 제거된 절대 URL 생성
+// Prevent fetch failure from BasicAuth URL(user:pass@host): generate absolute URL with credentials removed
 function safeUrl(relativeOrAbsoluteUrl) {
     try {
         return new URL(relativeOrAbsoluteUrl, window.location.origin).href;
@@ -37,7 +37,7 @@ async function fetchText(url) {
 }
 
 // ============================================================
-// PDF.js 렌더링 (Alpine proxy 회피를 위해 순수 함수로 분리)
+// PDF.js Rendering (separated as pure functions to avoid Alpine proxy)
 // ============================================================
 async function _loadPdfDoc(arrayBuffer) {
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -68,7 +68,7 @@ async function _renderPdfPageRaw(pageNum) {
 }
 
 // ============================================================
-// 파일 확장자 → 언어 매핑 (openFile에서 사용)
+// File extension → language mapping (used in openFile)
 // ============================================================
 const LANG_MAP = {
     'py': 'python', 'js': 'javascript', 'ts': 'typescript',
@@ -85,7 +85,7 @@ const LANG_MAP = {
 };
 
 // ============================================================
-// 모드별 설정 (chat/code/paper 통합용)
+// Mode-specific config (unified for chat/code/paper)
 // ============================================================
 function _modeConfig(mode, paramName, overrides = {}) {
     const cap = paramName.charAt(0).toUpperCase() + paramName.slice(1);
@@ -123,11 +123,11 @@ const MODE_CONFIG = {
         paramName: 'session_id', sessionKey: 'chatSessionId',
         statusUrl: '/chat/status/',
     },
-    code: _modeConfig('code', 'project', { itemLabel: '프로젝트' }),
-    paper: _modeConfig('paper', 'paper', { itemLabel: '논문' }),
+    code: _modeConfig('code', 'project', { itemLabel: 'Project' }),
+    paper: _modeConfig('paper', 'paper', { itemLabel: 'Paper' }),
 };
 
-// SSE cleanup 헬퍼
+// SSE cleanup helper
 function createSSECleanup(mode, eventSource, alpineRoot) {
     const cfg = MODE_CONFIG[mode];
     return (isDone) => {
@@ -140,13 +140,13 @@ function createSSECleanup(mode, eventSource, alpineRoot) {
         if (mode === 'chat') window.chatResponseId = null;
         if (alpineRoot?._x_dataStack) {
             alpineRoot._x_dataStack[0][cfg.streamingKey] = false;
-            // done 없이 끊긴 경우 플래그 설정 (visibilitychange에서 감지용)
+            // Set flag when disconnected without done (detected in visibilitychange)
             if (!isDone) alpineRoot._x_dataStack[0]._sseDisconnected = mode;
         }
     };
 }
 
-// 스크롤 컨테이너 찾기
+// Find scroll container
 function getScrollContainer(mode) {
     const cfg = MODE_CONFIG[mode];
     const el = document.getElementById(cfg.messagesElId);
@@ -154,7 +154,7 @@ function getScrollContainer(mode) {
 }
 
 // ============================================================
-// 도구 카드 생성 (통합) - 6곳에서 중복되던 코드를 하나로
+// Tool card creation (unified) - consolidated from 6 duplicated locations
 // ============================================================
 const ToolCards = {
     iconMap: {
@@ -170,14 +170,14 @@ const ToolCards = {
     },
 
     titles: {
-        Edit: '파일 수정',
-        Read: '파일 읽기',
-        Write: '파일 생성',
-        Bash: '명령 실행',
-        Glob: '검색',
-        Grep: '검색',
-        WebSearch: '웹 검색',
-        WebFetch: '웹 페이지'
+        Edit: 'Edit file',
+        Read: 'Read file',
+        Write: 'Create file',
+        Bash: 'Run command',
+        Glob: 'Search',
+        Grep: 'Search',
+        WebSearch: 'Web search',
+        WebFetch: 'Web page'
     },
 
     detailKeys: {
@@ -192,7 +192,7 @@ const ToolCards = {
             const val = input[key] || '';
             return key === 'file_path' ? val.split('/').pop() : val;
         }
-        // MCP 등 알려지지 않은 도구: input 파라미터 표시
+        // Unknown tools like MCP: display input parameters
         if (!input || Object.keys(input).length === 0) return '';
         return Object.entries(input)
             .map(([k, v]) => {
@@ -208,7 +208,7 @@ const ToolCards = {
 
     getTitle(name) {
         if (this.titles[name]) return this.titles[name];
-        // MCP 도구: mcp__server__tool → tool (언더스코어를 공백으로)
+        // MCP tool: mcp__server__tool → tool (underscores to spaces)
         if (name.startsWith('mcp__') || name.startsWith('mcp_')) {
             const parts = name.split('__');
             const toolPart = parts.length >= 3 ? parts.slice(2).join('__') : parts[parts.length - 1];
@@ -217,7 +217,7 @@ const ToolCards = {
         return name;
     },
 
-    create(name, input, status = '진행 중...') {
+    create(name, input, status = 'In progress...') {
         const card = document.createElement('div');
         card.className = 'bg-white rounded-lg overflow-hidden border border-claude-border';
 
@@ -228,7 +228,7 @@ const ToolCards = {
             ? `<div class="px-3 py-2 bg-slate-100 border-t border-claude-border"><pre class="text-xs text-slate-600 font-mono whitespace-pre-wrap break-all">${this.escapeHtml(detail)}</pre></div>`
             : '';
 
-        const statusClass = status === '완료' ? 'text-claude-accent' : 'text-claude-text-secondary';
+        const statusClass = status === 'Done' ? 'text-claude-accent' : 'text-claude-text-secondary';
         card.innerHTML = `<div class="px-3 py-2 flex items-center gap-2 bg-claude-sidebar">${iconHtml}<span class="text-sm text-claude-text">${title}</span><span class="text-xs ${statusClass} ml-auto">${status}</span></div>${detailHtml}`;
 
         return card;
@@ -252,7 +252,7 @@ const ToolCards = {
 
         const card = document.createElement('div');
         card.className = 'bg-white rounded-lg overflow-hidden border border-claude-accent';
-        card.innerHTML = `<div class="px-3 py-2 bg-claude-accent/5 flex items-center gap-2">${icon('check', 'w-4 h-4 text-claude-accent')}<span class="text-sm text-claude-text">파일 수정됨</span><span class="text-xs text-claude-text-secondary">${fileName}</span></div><div class="max-h-40 overflow-y-auto">${diffHtml}</div>`;
+        card.innerHTML = `<div class="px-3 py-2 bg-claude-accent/5 flex items-center gap-2">${icon('check', 'w-4 h-4 text-claude-accent')}<span class="text-sm text-claude-text">File modified</span><span class="text-xs text-claude-text-secondary">${fileName}</span></div><div class="max-h-40 overflow-y-auto">${diffHtml}</div>`;
 
         return card;
     },
@@ -262,13 +262,13 @@ const ToolCards = {
         const isError = data.exitCode !== 0 || data.stderr;
         const cmd = data.command || '';
         const statusColor = isError ? 'text-red-500' : 'text-claude-accent';
-        const statusText = isError ? '실패' : '완료';
+        const statusText = isError ? 'Failed' : 'Done';
 
         card.className = 'bg-white border border-claude-border rounded-lg overflow-hidden';
         card.innerHTML = `
             <div class="px-3 py-2 flex items-center gap-2 bg-claude-sidebar">
                 ${icon('terminal', 'w-4 h-4 ' + statusColor)}
-                <span class="text-sm text-claude-text">명령 실행</span>
+                <span class="text-sm text-claude-text">Run command</span>
                 <span class="text-xs ${statusColor} ml-auto">${statusText}</span>
             </div>
             ${cmd ? `<div class="px-3 py-2 bg-slate-100 border-t border-claude-border"><pre class="text-xs text-slate-600 font-mono">$ ${this.escapeHtml(cmd)}</pre></div>` : ''}
@@ -280,7 +280,7 @@ const ToolCards = {
         const output = data.output || '';
         const badge = card.querySelector('.text-claude-text-secondary.ml-auto, .ml-auto');
         if (badge) {
-            badge.textContent = '완료';
+            badge.textContent = 'Done';
             badge.className = 'text-xs text-claude-accent ml-auto';
         }
         if (output) {
@@ -296,7 +296,7 @@ const ToolCards = {
 };
 
 // ============================================================
-// UI 아이콘 헬퍼 (index.html에서 x-html로 재사용)
+// UI icon helper (reused via x-html in index.html)
 // ============================================================
 window.icon = function(name, cls) {
     const paths = {
@@ -343,7 +343,7 @@ window.icon = function(name, cls) {
 };
 
 // ============================================================
-// 마크다운 렌더링 유틸리티
+// Markdown rendering utilities
 // ============================================================
 function renderMarkdown(text) {
     if (typeof marked !== 'undefined') {
@@ -406,7 +406,7 @@ function bindCopyButton(btn, getText) {
 }
 
 // ============================================================
-// SSE 공통 헬퍼
+// SSE common helpers
 // ============================================================
 const SPINNER_SVG = (cls) => `<svg class="${cls} animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
 
@@ -424,7 +424,7 @@ function handleToolEvent(type, d, ctx) {
     if (type === 'tool_use') {
         if (ctx.displayedToolIds.has(d.id)) return;
         ctx.displayedToolIds.add(d.id);
-        update(d.name + ' 실행 중...');
+        update(d.name + ' Running...');
         const card = ToolCards.create(d.name, d.input);
         card.id = 'tool-' + d.id;
         ctx.eventsEl.appendChild(card);
@@ -441,7 +441,7 @@ function handleToolEvent(type, d, ctx) {
         const card = document.getElementById('tool-' + d.toolId);
         if (card) ToolCards.updateBashResult(card, d);
     } else if (type === 'text' && d.text) {
-        update('응답 생성 중...');
+        update('Generating response...');
         appendRawContent(ctx.rawContent, d.text);
         ctx.eventsEl.appendChild(createTextBlock(d.text));
     }
@@ -470,10 +470,10 @@ function replayToolEvents(events, ctx) {
 }
 
 // ============================================================
-// SSE 핸들러 설정 (채팅/코드/paper 모드 공용)
+// SSE handler setup (shared for chat/code/paper modes)
 // config: { responseId, mode: 'chat'|'code'|'paper', project?, paper? }
 // ============================================================
-// 세션 전환 감지용 세대 카운터
+// Generation counter for detecting session switches
 window._chatGen = 0;
 
 function setupSSEHandlers(config) {
@@ -481,7 +481,7 @@ function setupSSEHandlers(config) {
     const cfg = MODE_CONFIG[mode];
     const isChat = mode === 'chat';
 
-    // 세션 전환으로 이 응답이 무효화된 경우 SSE 시작하지 않음
+    // Don't start SSE if this response was invalidated by a session switch
     if (isChat && window._pendingChatGen !== window._chatGen) return;
 
     const statusEl = document.getElementById('status-' + responseId);
@@ -493,17 +493,17 @@ function setupSSEHandlers(config) {
     const alpineRoot = document.querySelector('[x-data]');
     const scrollContainer = getScrollContainer(mode);
 
-    // Alpine 상태 업데이트
+    // Update Alpine state
     if (alpineRoot?._x_dataStack) alpineRoot._x_dataStack[0][cfg.streamingKey] = true;
     window[cfg.eventSourceKey] = eventSource;
     if (isChat) window.chatResponseId = responseId;
 
-    // 타이머 설정
+    // Timer setup
     const startTime = Date.now();
     const formatElapsed = () => {
         const s = Math.floor((Date.now() - startTime) / 1000);
         const m = Math.floor(s / 60);
-        return m > 0 ? m + '분 ' + (s % 60) + '초' : s + '초';
+        return m > 0 ? m + 'm ' + (s % 60) + 's' : s + 's';
     };
     window[cfg.timerKey] = setInterval(() => {
         if (timerEl) timerEl.textContent = '(' + Math.floor((Date.now() - startTime) / 1000) + 's)';
@@ -513,7 +513,7 @@ function setupSSEHandlers(config) {
     const displayedToolIds = new Set();
     const cleanup = createSSECleanup(mode, eventSource, alpineRoot);
 
-    // 공통 도구 이벤트 바인딩
+    // Common tool event bindings
     bindToolSSEListeners(eventSource, {
         eventsEl, displayedToolIds, rawContent,
         scrollToBottom: () => { if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight; },
@@ -521,7 +521,7 @@ function setupSSEHandlers(config) {
         updateStatus: (text) => { if (statusTextEl) statusTextEl.textContent = text; }
     });
 
-    // 모드별 이벤트 핸들러
+    // Mode-specific event handlers
     if (isChat) {
         eventSource.addEventListener('title', e => {
             document.getElementById('session-title').textContent = e.data;
@@ -541,7 +541,7 @@ function setupSSEHandlers(config) {
             } catch(err) {}
         });
     } else {
-        eventSource.addEventListener('init', () => { if (statusTextEl) statusTextEl.textContent = '세션 시작됨'; });
+        eventSource.addEventListener('init', () => { if (statusTextEl) statusTextEl.textContent = 'Session started'; });
         eventSource.addEventListener('result', e => {
             try {
                 const data = JSON.parse(e.data);
@@ -549,7 +549,7 @@ function setupSSEHandlers(config) {
                 if (lastCard?.classList.contains('bg-white')) {
                     const timeDiv = document.createElement('div');
                     timeDiv.className = 'text-xs text-claude-text-secondary mt-2 pt-2 border-t border-claude-border';
-                    timeDiv.textContent = '소요시간: ' + formatElapsed();
+                    timeDiv.textContent = 'Duration: ' + formatElapsed();
                     lastCard.appendChild(timeDiv);
                 }
                 if (data.contextPercent !== undefined && document.body._x_dataStack)
@@ -558,7 +558,7 @@ function setupSSEHandlers(config) {
         });
         eventSource.addEventListener('error_msg', e => {
             clearInterval(window[cfg.timerKey]);
-            if (statusEl) statusEl.innerHTML = '<span class="text-red-500">오류 발생</span>';
+            if (statusEl) statusEl.innerHTML = '<span class="text-red-500">Error occurred</span>';
             const finalEl = document.getElementById('final-' + responseId);
             if (finalEl) {
                 finalEl.className = 'bg-red-50 border border-red-300 rounded-lg p-4 text-red-700';
@@ -573,7 +573,7 @@ function setupSSEHandlers(config) {
         if (isChat) {
             const footer = document.createElement('div');
             footer.className = 'flex items-center justify-between mt-4';
-            footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="전체 복사">${icon('copy')}</button></div><span class="text-xs text-claude-text-secondary/60">${formatElapsed()}</span>`;
+            footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="Copy all">${icon('copy')}</button></div><span class="text-xs text-claude-text-secondary/60">${formatElapsed()}</span>`;
             eventsEl.appendChild(footer);
             bindCopyButton(footer.querySelector('.copy-btn'), () => rawContent.value);
             const container = document.getElementById('chat-response-' + responseId);
@@ -581,7 +581,7 @@ function setupSSEHandlers(config) {
         } else {
             const footer = document.createElement('div');
             footer.className = 'flex items-center justify-between mt-2';
-            footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="전체 복사">${icon('copy')}</button></div><span class="text-xs text-claude-text-secondary/60">${formatElapsed()}</span>`;
+            footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="Copy all">${icon('copy')}</button></div><span class="text-xs text-claude-text-secondary/60">${formatElapsed()}</span>`;
             eventsEl.appendChild(footer);
             bindCopyButton(footer.querySelector('.copy-btn'), () => rawContent.value);
             const itemName = mode === 'paper' ? config.paper : config.project;
@@ -593,32 +593,32 @@ function setupSSEHandlers(config) {
 }
 
 // ============================================================
-// Alpine.js 앱 데이터
+// Alpine.js app data
 // ============================================================
 window.appData = function() {
     const data = {
-        // 공통 상태
+        // Common state
         sidebarOpen: false,
         message: '',
         mode: 'chat',
-        _sseDisconnected: null,  // SSE가 done 없이 끊긴 모드 ('chat'|'code'|'paper'|null)
+        _sseDisconnected: null,  // Mode where SSE disconnected without done ('chat'|'code'|'paper'|null)
 
-        // 채팅 모드
+        // Chat mode
         chatSessionId: '',
-        chatSessionTitle: '새 대화',
+        chatSessionTitle: 'New Chat',
         chatSessions: [],
         chatStreaming: false,
         chatHasMessages: false,
         chatContextPercent: 0,
 
-        // 코드 모드
+        // Code mode
         currentProject: null,
         projects: [],
         contextPercent: 0,
         codeStreaming: false,
-        expandedFolders: [],  // 펼쳐진 폴더 경로 목록
+        expandedFolders: [],  // List of expanded folder paths
 
-        // 모델 선택
+        // Model selection
         selectedModel: 'sonnet',
         modelOptions: [
             { value: 'haiku', label: 'Haiku' },
@@ -626,91 +626,91 @@ window.appData = function() {
             { value: 'opus', label: 'Opus' },
         ],
 
-        // Paper 모드
+        // Paper mode
         currentPaper: null,
         papers: [],  // [{name}]
         paperContextPercent: 0,
         paperStreaming: false,
         paperTemplates: [],
-        paperExpandedFolders: [],  // Paper 모드 펼쳐진 폴더 경로 목록
+        paperExpandedFolders: [],  // Paper mode list of expanded folder paths
 
-        // 새 프로젝트 모달
+        // New project modal
         showNewProjectModal: false,
         newProjectName: '',
 
-        // 새 논문 모달
+        // New paper modal
         showNewPaperModal: false,
         newPaperName: '',
         selectedTemplate: '',
         paperNameError: '',
 
-        // 파일 내용 모달
+        // File content modal
         showFileModal: false,
         fileModalPath: '',
         fileModalContent: '',
         fileModalHighlighted: '',
         fileModalLoading: false,
-        fileModalMediaType: '', // 'image', 'video', 'pdf', '' (텍스트)
+        fileModalMediaType: '', // 'image', 'video', 'pdf', '' (text)
         fileModalMediaUrl: '',
         fileModalEditing: false,
         fileModalEditContent: '',
         fileModalSaving: false,
-        fileModalMode: '', // 어떤 모드에서 열었는지 (code/paper)
+        fileModalMode: '', // which mode opened it (code/paper)
 
-        // PDF.js 상태 (pdfDoc은 window._pdfDoc에 저장 — Alpine proxy 회피)
+        // PDF.js state (pdfDoc stored in window._pdfDoc — avoids Alpine proxy)
         pdfPage: 1,
         pdfTotalPages: 0,
 
-        // MCP 도구
+        // MCP tools
         mcpTools: [],
         mcpServers: [],
         selectedMcpServer: null,
         newMcpServer: { key: '', name: '', type: 'sse', url: '', command: '', argsText: '', modes: ['chat', 'code', 'paper'] },
         mcpServerAdding: false,
         mcpServerEditMode: 'add', // 'add' | 'edit'
-        allMcpServers: [], // 모드 무관 전체 서버 목록 (관리용)
+        allMcpServers: [], // Full server list across all modes (for management)
 
-        // 첨부 패널
+        // Attach panel
         attachPanelOpen: false,
         attachPanelView: 'main',  // 'main' | 'commands' | 'tools' | 'tools-detail' | 'add-mcp-server'
         attachPanelStyle: '',
         attachItems: [
-            { icon: icon('camera', 'w-5 h-5 text-claude-text-secondary'), label: '카메라', action: 'pickCamera' },
-            { icon: icon('image', 'w-5 h-5 text-claude-text-secondary'), label: '이미지', action: 'pickImage' },
-            { icon: icon('file', 'w-5 h-5 text-claude-text-secondary'), label: '파일', action: 'pickFile' },
+            { icon: icon('camera', 'w-5 h-5 text-claude-text-secondary'), label: 'Camera', action: 'pickCamera' },
+            { icon: icon('image', 'w-5 h-5 text-claude-text-secondary'), label: 'Image', action: 'pickImage' },
+            { icon: icon('file', 'w-5 h-5 text-claude-text-secondary'), label: 'File', action: 'pickFile' },
         ],
 
-        // 첨부 파일
+        // Attached files
         attachedFiles: [],  // [{id, name, saveName, type, previewUrl}]
         dragOver: false,
         dragOverCount: 0,
 
-        // 컨텍스트 메뉴 (롱프레스)
+        // Context menu (long press)
         contextMenu: { show: false, x: 0, y: 0, type: '', target: null },
         longPressTimer: null,
         longPressTriggered: false,
 
-        // 도구 메뉴
+        // Tools menu
         showToolsMenu: false,
 
-        // 음성 → voice.js (voiceMixin), 터미널 → terminal.js (terminalMixin)
+        // Voice → voice.js (voiceMixin), Terminal → terminal.js (terminalMixin)
 
-        // 아카이브
+        // Archive
         showArchiveModal: false,
         archiveMode: 'code',
         archivedItems: [],
 
-        // 새로 만들기 모달
+        // Create new modal
         showCreateModal: false,
-        createMode: 'code',       // 현재 모드 (code/paper)
+        createMode: 'code',       // current mode (code/paper)
         createType: 'file',       // 'file' | 'folder'
-        createPath: '/',          // 위치 (디렉토리 경로)
-        createName: '',           // 파일/폴더명
-        createDirs: ['/'],        // 선택 가능한 디렉토리 목록
-        createDirsFiltered: ['/'],// 필터링된 목록
-        createDirsOpen: false,    // 드롭다운 열림 여부
+        createPath: '/',          // location (directory path)
+        createName: '',           // file/folder name
+        createDirs: ['/'],        // available directory list
+        createDirsFiltered: ['/'],// filtered list
+        createDirsOpen: false,    // dropdown open state
 
-        // 명령어 기능
+        // Commands feature
         commands: [],
         showCommandModal: false,
         commandModalMode: 'create',  // 'create' | 'edit'
@@ -718,14 +718,14 @@ window.appData = function() {
         newCommandName: '',
         newCommandContent: '',
 
-        // ==================== 롱프레스 컨텍스트 메뉴 ====================
+        // ==================== Long press context menu ====================
 
         _contextMenuHeight(type) {
-            if (type === 'file') return 176;  // 경로복사 + 파일명복사 + 다운로드 + 삭제
-            if (type === 'dir') return 132;   // 경로복사 + 폴더명복사 + 삭제
+            if (type === 'file') return 176;  // copy path + copy filename + download + delete
+            if (type === 'dir') return 132;   // copy path + copy foldername + delete
             if (type === 'command') return 88;
-            if (type === 'project') return 176;  // 이름변경 + 복제 + 아카이브 + 삭제
-            if (type === 'paper') return 220;  // PDF보기 + 이름변경 + 복제 + 아카이브 + 삭제
+            if (type === 'project') return 176;  // rename + clone + archive + delete
+            if (type === 'paper') return 220;  // view PDF + rename + clone + archive + delete
             return 44;
         },
 
@@ -790,8 +790,8 @@ window.appData = function() {
             const target = this._closeContextMenu();
             const mode = type === 'project' ? 'code' : 'paper';
             const itemName = typeof target === 'string' ? target : target.name;
-            const label = mode === 'code' ? '프로젝트' : '논문';
-            const newName = prompt(`${label} 이름 변경`, itemName);
+            const label = mode === 'code' ? 'Project' : 'Paper';
+            const newName = prompt(`Rename ${label}`, itemName);
             if (!newName || newName.trim() === '' || newName.trim() === itemName) return;
             const trimmed = newName.trim();
             const formData = new FormData();
@@ -805,11 +805,11 @@ window.appData = function() {
                     await this[cfg.loadListMethod]();
                     this._selectItem(mode, mode === 'code' ? trimmed : { name: trimmed });
                 } else {
-                    alert(data.error || '이름 변경 실패');
+                    alert(data.error || 'Rename failed');
                 }
             } catch (e) {
-                console.error('이름 변경 실패:', e);
-                alert('이름 변경 중 오류가 발생했습니다.');
+                console.error('Rename failed:', e);
+                alert('An error occurred during rename.');
             }
         },
 
@@ -818,7 +818,7 @@ window.appData = function() {
             const target = this._closeContextMenu();
             const mode = type === 'project' ? 'code' : 'paper';
             const itemName = typeof target === 'string' ? target : target.name;
-            // -2, -3, ... 형태로 이름 생성
+            // Generate name with -2, -3, ... suffix
             const cfg = MODE_CONFIG[mode];
             const existingNames = new Set((this[cfg.listKey] || []).map(i => typeof i === 'string' ? i : i.name));
             let cloneName = itemName;
@@ -838,11 +838,11 @@ window.appData = function() {
                     await this[cfg.loadListMethod]();
                     this._selectItem(mode, mode === 'code' ? cloneName : { name: cloneName });
                 } else {
-                    alert(data.error || '복제 실패');
+                    alert(data.error || 'Clone failed');
                 }
             } catch (e) {
-                console.error('복제 실패:', e);
-                alert('복제 중 오류가 발생했습니다.');
+                console.error('Clone failed:', e);
+                alert('An error occurred during clone.');
             }
         },
 
@@ -898,7 +898,7 @@ window.appData = function() {
                 const resp = await fetch(safeUrl(url));
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => null);
-                    this.fileModalContent = err?.error || 'PDF 파일을 불러올 수 없습니다.';
+                    this.fileModalContent = err?.error || 'Cannot load PDF file.';
                     this.fileModalMediaType = '';
                     this.fileModalLoading = false;
                     return;
@@ -916,13 +916,13 @@ window.appData = function() {
                     this.fileModalLoading = false;
                     this.$nextTick(() => this.renderPdfPage(1));
                 } else {
-                    this.fileModalContent = 'PDF.js 미로드 (pdfjsLib=' + typeof window.pdfjsLib + ')';
+                    this.fileModalContent = 'PDF.js not loaded (pdfjsLib=' + typeof window.pdfjsLib + ')';
                     this.fileModalMediaType = '';
                     this.fileModalLoading = false;
                 }
             } catch (e) {
                 console.error('PDF load error:', e);
-                this.fileModalContent = 'PDF 오류: ' + e.message;
+                this.fileModalContent = 'PDF error: ' + e.message;
                 this.fileModalMediaType = '';
                 this.fileModalLoading = false;
             }
@@ -962,7 +962,7 @@ window.appData = function() {
             if (target) navigator.clipboard.writeText(target.name);
         },
 
-        // ==================== 공통 메서드 ====================
+        // ==================== Common methods ====================
 
         autoResize(el) {
             el.style.height = 'auto';
@@ -1085,8 +1085,8 @@ window.appData = function() {
                     });
                 }
             } catch(e) {
-                console.error('파일 업로드 실패:', e);
-                alert('파일 업로드에 실패했습니다.');
+                console.error('File upload failed:', e);
+                alert('File upload failed.');
             }
         },
 
@@ -1146,7 +1146,7 @@ window.appData = function() {
             document.querySelectorAll(`#${cfg.messagesElId} [id^="${statusPrefix}"]`).forEach(el => el.remove());
         },
 
-        // ==================== 채팅 모드 메서드 ====================
+        // ==================== Chat mode methods ====================
 
         async loadChatSessions() {
             this.chatSessions = await fetchJSON('/sessions?mode=chat') || [];
@@ -1158,13 +1158,13 @@ window.appData = function() {
             if (window.chatTimerInterval) { clearInterval(window.chatTimerInterval); window.chatTimerInterval = null; }
             this.chatStreaming = false;
             this.chatSessionId = '';
-            this.chatSessionTitle = '새 대화';
+            this.chatSessionTitle = 'New Chat';
             this.chatHasMessages = false;
             this.chatContextPercent = 0;
             const messagesEl = document.getElementById('chat-messages-inner');
             if (messagesEl) { htmx.trigger(messagesEl, 'htmx:abort'); messagesEl.innerHTML = ''; }
             const titleEl = document.getElementById('session-title');
-            if (titleEl) titleEl.textContent = '새 대화';
+            if (titleEl) titleEl.textContent = 'New Chat';
             this.loadChatSessions();
             this.sidebarOpen = false;
         },
@@ -1214,7 +1214,7 @@ window.appData = function() {
         },
 
         async deleteAllChatSessions() {
-            if (!confirm('모든 대화를 삭제하시겠습니까?')) return;
+            if (!confirm('Delete all chats?')) return;
             await fetch(safeUrl('/sessions/chat'), { method: 'DELETE' });
             await this.loadChatSessions();
             this.newChatSession();
@@ -1223,7 +1223,7 @@ window.appData = function() {
 
         async deleteChatSession(sessionId, e) {
             e.stopPropagation();
-            if (!confirm('이 대화를 삭제하시겠습니까?')) return;
+            if (!confirm('Delete this chat?')) return;
             await fetch(safeUrl('/session/' + sessionId), { method: 'DELETE' });
             this.loadChatSessions();
             if (this.chatSessionId === sessionId) this.newChatSession();
@@ -1236,7 +1236,7 @@ window.appData = function() {
                 this._sseDisconnected = null;
                 this._resumeModeStream('chat', data.active[0]);
             } else if (this._sseDisconnected === 'chat') {
-                // SSE가 done 없이 끊긴 상태에서 서버 응답이 이미 완료됨 → DB에서 메시지 다시 로드
+                // SSE disconnected without done and server response already completed → reload messages from DB
                 this._sseDisconnected = null;
                 this.selectChatSession({ id: this.chatSessionId, title: this.chatSessionTitle });
             } else {
@@ -1246,9 +1246,9 @@ window.appData = function() {
             }
         },
 
-        // ==================== 코드/Paper 모드 통합 메서드 ====================
+        // ==================== Unified code/paper mode methods ====================
 
-        // 통합: 항목 선택 (code/paper)
+        // Unified: select item (code/paper)
         async _selectItem(mode, item) {
             const cfg = MODE_CONFIG[mode];
             const itemName = typeof item === 'string' ? item : item.name;
@@ -1271,7 +1271,7 @@ window.appData = function() {
             this._checkActiveResponses(mode);
         },
 
-        // 통합: 메시지 로드 (code/paper)
+        // Unified: load messages (code/paper)
         async _loadMessages(mode, itemName) {
             const cfg = MODE_CONFIG[mode];
             const html = await fetchText(cfg.endpoints.messages + '?' + cfg.paramName + '=' + encodeURIComponent(itemName));
@@ -1279,7 +1279,7 @@ window.appData = function() {
             if (msgEl) { msgEl.innerHTML = html; renderMarkdownElements(msgEl); }
         },
 
-        // 통합: 세션 초기화 (code/paper)
+        // Unified: clear session (code/paper)
         async _clearSession(mode) {
             const cfg = MODE_CONFIG[mode];
             if (!this[cfg.currentKey]) return;
@@ -1290,12 +1290,12 @@ window.appData = function() {
             await this._loadMessages(mode, this[cfg.currentKey]);
         },
 
-        // 통합: 프로젝트/논문 삭제 (code/paper)
+        // Unified: delete project/paper (code/paper)
         async _deleteItem(mode, item, e) {
             e.stopPropagation();
             const cfg = MODE_CONFIG[mode];
             const itemName = typeof item === 'string' ? item : item.name;
-            if (!confirm(cfg.itemLabel + ' [' + itemName + ']을(를) 삭제하시겠습니까? 모든 파일이 삭제됩니다.')) return;
+            if (!confirm(cfg.itemLabel + ' [' + itemName + ']? All files will be deleted.')) return;
 
             const data = await fetchJSON(cfg.endpoints.deleteProject + '?' + cfg.paramName + '=' + encodeURIComponent(itemName), { method: 'DELETE' });
             if (data?.success) {
@@ -1306,11 +1306,11 @@ window.appData = function() {
                     document.getElementById(cfg.messagesElId).innerHTML = '';
                 }
             } else {
-                alert(data?.error || '삭제 실패');
+                alert(data?.error || 'Delete failed');
             }
         },
 
-        // 통합: 폴더 접기/펼치기 (code/paper)
+        // Unified: toggle folder expand/collapse (code/paper)
         toggleFolder(path, mode = 'code') {
             const cfg = MODE_CONFIG[mode];
             const container = document.getElementById(cfg.fileTreeElId);
@@ -1331,21 +1331,21 @@ window.appData = function() {
             }
         },
 
-        // 통합: 파일 삭제 (code/paper)
+        // Unified: delete file (code/paper)
         async _deleteFile(mode, path, e) {
             e.stopPropagation();
             const cfg = MODE_CONFIG[mode];
-            if (!confirm('[' + path + ']을(를) 삭제하시겠습니까?')) return;
+            if (!confirm('Delete [' + path + ']?')) return;
 
             const data = await fetchJSON(cfg.endpoints.deleteFile + '?' + cfg.paramName + '=' + encodeURIComponent(this[cfg.currentKey]) + '&path=' + encodeURIComponent(path), { method: 'DELETE' });
             if (data?.success) {
                 htmx.ajax('GET', cfg.endpoints.files + '?' + cfg.paramName + '=' + this[cfg.currentKey], {target: '#' + cfg.fileTreeElId, swap: 'innerHTML'});
             } else {
-                alert(data?.error || '삭제 실패');
+                alert(data?.error || 'Delete failed');
             }
         },
 
-        // 통합: 새로 만들기 모달 열기 (code/paper)
+        // Unified: open create modal (code/paper)
         async openCreateModal(mode) {
             const cfg = MODE_CONFIG[mode];
             if (!this[cfg.currentKey]) return;
@@ -1355,7 +1355,7 @@ window.appData = function() {
             this.createName = '';
             this.createDirsOpen = false;
             this.showCreateModal = true;
-            // 디렉토리 목록 로드
+            // Load directory list
             const dirs = await fetchJSON(cfg.endpoints.listDirs + '?' + cfg.paramName + '=' + encodeURIComponent(this[cfg.currentKey]));
             this.createDirs = dirs || ['/'];
             this.createDirsFiltered = this.createDirs;
@@ -1386,14 +1386,14 @@ window.appData = function() {
                     this.showCreateModal = false;
                     htmx.ajax('GET', cfg.endpoints.files + '?' + cfg.paramName + '=' + this[cfg.currentKey], {target: '#' + cfg.fileTreeElId, swap: 'innerHTML'});
                 } else {
-                    alert(data.error || '생성 실패');
+                    alert(data.error || 'Creation failed');
                 }
             } catch (e) {
-                alert('생성 중 오류가 발생했습니다.');
+                alert('An error occurred during creation.');
             }
         },
 
-        // 통합: 파일 열기 (code/paper)
+        // Unified: open file (code/paper)
         async _openFile(mode, path) {
             const cfg = MODE_CONFIG[mode];
             this.fileModalPath = path;
@@ -1418,7 +1418,7 @@ window.appData = function() {
             }
 
             if (imageExts.includes(ext) || videoExts.includes(ext)) {
-                // 미디어 파일: 바이너리로 가져와서 미리보기
+                // Media file: fetch as binary for preview
                 const mediaType = imageExts.includes(ext) ? 'image' : 'video';
                 const rawParam = cfg.paramName + '=' + encodeURIComponent(this[cfg.currentKey]) + '&path=' + encodeURIComponent(path);
                 const url = cfg.endpoints.fileRaw + '?' + rawParam;
@@ -1426,7 +1426,7 @@ window.appData = function() {
                     const resp = await fetch(safeUrl(url));
                     if (!resp.ok) {
                         const err = await resp.json().catch(() => null);
-                        this.fileModalContent = err?.error || '파일을 불러올 수 없습니다.';
+                        this.fileModalContent = err?.error || 'Cannot load file.';
                         this.fileModalLoading = false;
                         return;
                     }
@@ -1435,18 +1435,18 @@ window.appData = function() {
                     this.fileModalMediaUrl = URL.createObjectURL(blob);
                     this.fileModalMediaType = mediaType;
                 } catch(e) {
-                    this.fileModalContent = '파일을 불러올 수 없습니다.';
+                    this.fileModalContent = 'Cannot load file.';
                 }
                 this.fileModalLoading = false;
                 return;
             }
 
-            // 텍스트 파일: 기존 로직
+            // Text file: existing logic
             const data = await fetchJSON(cfg.endpoints.fileContent + '?' + cfg.paramName + '=' + encodeURIComponent(this[cfg.currentKey]) + '&path=' + encodeURIComponent(path));
-            const content = data?.content || data?.error || '파일을 불러올 수 없습니다.';
+            const content = data?.content || data?.error || 'Cannot load file.';
             this.fileModalContent = content;
 
-            // 마크다운 파일: 렌더링된 HTML로 표시
+            // Markdown file: display as rendered HTML
             if (ext === 'md' || ext === 'markdown') {
                 this.fileModalMediaType = 'markdown';
                 this.fileModalLoading = false;
@@ -1472,7 +1472,7 @@ window.appData = function() {
             this.fileModalLoading = false;
         },
 
-        // 통합: 활성 응답 체크 (code/paper)
+        // Unified: check active responses (code/paper)
         async _checkActiveResponses(mode) {
             const cfg = MODE_CONFIG[mode];
             if (!this[cfg.currentKey]) return;
@@ -1481,7 +1481,7 @@ window.appData = function() {
                 this._sseDisconnected = null;
                 this._resumeModeStream(mode, data.active[0]);
             } else if (this._sseDisconnected === mode) {
-                // SSE가 done 없이 끊긴 상태에서 서버 응답이 이미 완료됨 → 메시지 다시 로드
+                // SSE disconnected without done and server response already completed → reload messages
                 this._sseDisconnected = null;
                 const item = this[cfg.currentKey];
                 this[cfg.currentKey] = null;
@@ -1489,7 +1489,7 @@ window.appData = function() {
             }
         },
 
-        // 통합: Resume UI 설정 (chat/code/paper 공용)
+        // Unified: setup resume UI (shared for chat/code/paper)
         _setupResumeUI(mode, responseId) {
             const cfg = MODE_CONFIG[mode];
             const isChat = mode === 'chat';
@@ -1508,7 +1508,7 @@ window.appData = function() {
                 const spinnerHtml = isChat ? `<div class="w-5 h-5 rounded-full bg-claude-accent/20 flex items-center justify-center">${SPINNER_SVG('w-3 h-3 text-claude-accent')}</div>` : SPINNER_SVG('w-4 h-4');
                 container.insertAdjacentHTML('beforeend', `
                     <div id="${wrapperId}" class="${cls}">
-                        <div id="status-${responseId}" class="flex items-center gap-2 text-claude-text-secondary text-sm${isChat ? ' mb-3' : ''}">${spinnerHtml}<span id="status-text-${responseId}">재연결 중...</span></div>
+                        <div id="status-${responseId}" class="flex items-center gap-2 text-claude-text-secondary text-sm${isChat ? ' mb-3' : ''}">${spinnerHtml}<span id="status-text-${responseId}">Reconnecting...</span></div>
                         <div id="events-${responseId}" class="space-y-2${isChat ? ' mb-3' : ''}"></div>
                     </div>`);
                 eventsEl = document.getElementById('events-' + responseId);
@@ -1519,7 +1519,7 @@ window.appData = function() {
             return { eventsEl, statusEl, alreadyDisplayed, scrollParent, updateStatusText: (text) => { if (statusTextEl) statusTextEl.textContent = text; } };
         },
 
-        // 통합: 기존 이벤트 리플레이 (chat/code/paper 공용)
+        // Unified: replay existing events (shared for chat/code/paper)
         _replayExistingEvents(status, alreadyDisplayed, eventsEl) {
             const displayedToolIds = new Set();
             const rawContent = { value: '' };
@@ -1534,7 +1534,7 @@ window.appData = function() {
             return { displayedToolIds, rawContent };
         },
 
-        // 통합: 스트림 재연결 (chat/code/paper)
+        // Unified: reconnect stream (chat/code/paper)
         async _resumeModeStream(mode, responseId) {
             const cfg = MODE_CONFIG[mode];
             const isChat = mode === 'chat';
@@ -1551,10 +1551,10 @@ window.appData = function() {
             const { eventsEl, statusEl, alreadyDisplayed, updateStatusText, scrollParent } = this._setupResumeUI(mode, responseId);
             const { displayedToolIds, rawContent } = this._replayExistingEvents(status, alreadyDisplayed, eventsEl);
             if (isChat) {
-                if (status.events?.length > 0) updateStatusText('진행 중...');
+                if (status.events?.length > 0) updateStatusText('In progress...');
             } else if (!alreadyDisplayed && status.events?.length > 0) {
                 const lastToolEvt = [...status.events].reverse().find(e => e.type === 'tool_use');
-                if (lastToolEvt) updateStatusText((lastToolEvt.data.name || '도구') + ' 실행 중...');
+                if (lastToolEvt) updateStatusText(lastToolEvt.data.name + ' Running...');
             }
             const scrollToBottom = () => { if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight; };
             scrollToBottom();
@@ -1571,7 +1571,7 @@ window.appData = function() {
                     if (statusEl) statusEl.remove();
                     const footer = document.createElement('div');
                     footer.className = 'flex items-center justify-between mt-2';
-                    footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="전체 복사">${icon('copy')}</button></div>`;
+                    footer.innerHTML = `<div class="flex gap-1"><button class="copy-btn p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-lg transition-all" title="Copy all">${icon('copy')}</button></div>`;
                     eventsEl.appendChild(footer);
                     bindCopyButton(footer.querySelector('.copy-btn'), () => rawContent.value);
                     if (this[cfg.currentKey]) { const item = this[cfg.currentKey]; this[cfg.currentKey] = null; this._selectItem(mode, item); }
@@ -1580,7 +1580,7 @@ window.appData = function() {
             eventSource.onerror = () => cleanup(false);
         },
 
-        // ==================== 코드 모드 래퍼 메서드 ====================
+        // ==================== Code mode wrapper methods ====================
 
         switchToCodeMode() {
             this.currentProject = null;
@@ -1592,7 +1592,7 @@ window.appData = function() {
             this.projects = await fetchJSON('/code/projects-json') || [];
         },
 
-        // ==================== Paper 모드 메서드 ====================
+        // ==================== Paper mode methods ====================
 
         switchToPaperMode() {
             this.currentPaper = null;
@@ -1611,10 +1611,10 @@ window.appData = function() {
         validatePaperName() {
             const name = this.newPaperName.trim();
             if (!name) { this.paperNameError = ''; return; }
-            if (!/^[a-z0-9-]+$/.test(name)) { this.paperNameError = '소문자, 숫자, 하이픈(-)만 사용 가능합니다'; return; }
-            if (name.startsWith('-') || name.endsWith('-')) { this.paperNameError = '하이픈으로 시작하거나 끝날 수 없습니다'; return; }
-            if (name.includes('--')) { this.paperNameError = '연속된 하이픈(--)은 사용할 수 없습니다'; return; }
-            if (this.papers.some(p => p.name === name)) { this.paperNameError = '이미 같은 이름의 프로젝트가 존재합니다.'; return; }
+            if (!/^[a-z0-9-]+$/.test(name)) { this.paperNameError = 'Only lowercase letters, numbers, and hyphens (-) allowed'; return; }
+            if (name.startsWith('-') || name.endsWith('-')) { this.paperNameError = 'Cannot start or end with a hyphen'; return; }
+            if (name.includes('--')) { this.paperNameError = 'Consecutive hyphens (--) are not allowed'; return; }
+            if (this.papers.some(p => p.name === name)) { this.paperNameError = 'A project with this name already exists.'; return; }
             this.paperNameError = '';
         },
 
@@ -1632,15 +1632,15 @@ window.appData = function() {
                     await this.loadPapers();
                     this._selectItem('paper', {name: this.newPaperName.trim()});
                 } else {
-                    this.paperNameError = data.error || '생성 실패';
+                    this.paperNameError = data.error || 'Creation failed';
                 }
             } catch(e) {
                 console.error(e);
-                this.paperNameError = '네트워크 오류';
+                this.paperNameError = 'Network error';
             }
         },
 
-        // ==================== 아카이브 관련 ====================
+        // ==================== Archive ====================
 
         async openArchiveModal(mode) {
             this.archiveMode = mode;
@@ -1659,7 +1659,7 @@ window.appData = function() {
             }
         },
 
-        // ==================== 명령어 관련 ====================
+        // ==================== Commands ====================
 
         async loadCommands() {
             this.commands = await fetchJSON('/commands') || [];
@@ -1698,7 +1698,7 @@ window.appData = function() {
         },
 
         async saveCommand() {
-            if (!this.newCommandName.trim() || !this.newCommandContent.trim()) { alert('이름과 내용을 모두 입력해주세요'); return; }
+            if (!this.newCommandName.trim() || !this.newCommandContent.trim()) { alert('Please enter both name and content'); return; }
             const formData = new FormData();
             formData.append('name', this.newCommandName.trim());
             formData.append('content', this.newCommandContent.trim());
@@ -1712,13 +1712,13 @@ window.appData = function() {
 
         async deleteCommand(cmd, e) {
             e.stopPropagation();
-            if (!confirm(`명령어 [${cmd.name}]을(를) 삭제하시겠습니까?`)) return;
+            if (!confirm(`Delete command [${cmd.name}]?`)) return;
             const data = await fetchJSON('/command/' + cmd.id, { method: 'DELETE' });
             if (data?.error) { alert(data.error); return; }
             this.loadCommands();
         },
 
-        // ==================== 모델 선택 ====================
+        // ==================== Model selection ====================
 
         async loadSelectedModel() {
             const data = await fetchJSON('/settings/model');
@@ -1730,10 +1730,10 @@ window.appData = function() {
             fetch(safeUrl('/settings/model'), {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model })
-            }).catch(e => console.error('모델 설정 저장 실패:', e));
+            }).catch(e => console.error('Failed to save model setting:', e));
         },
 
-        // ==================== MCP 도구 ====================
+        // ==================== MCP tools ====================
 
         async loadMcpTools() {
             const requestedMode = this.mode;
@@ -1748,7 +1748,7 @@ window.appData = function() {
             fetch('/mcp/settings', {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(this.mcpTools.filter(t => t.enabled).map(t => t.name))
-            }).catch(e => console.error('MCP 설정 저장 실패:', e));
+            }).catch(e => console.error('Failed to save MCP settings:', e));
         },
 
         updateMcpServers() {
@@ -1776,7 +1776,7 @@ window.appData = function() {
             try {
                 const servers = await fetchJSON('/mcp/servers');
                 this.allMcpServers = servers || [];
-            } catch (e) { console.error('MCP 서버 목록 로드 실패:', e); }
+            } catch (e) { console.error('Failed to load MCP server list:', e); }
             this.attachPanelView = 'manage-mcp-servers';
         },
 
@@ -1799,7 +1799,7 @@ window.appData = function() {
                 };
                 this.mcpServerEditMode = 'edit';
                 this.attachPanelView = 'edit-mcp-server';
-            } catch (e) { console.error('MCP 서버 정보 로드 실패:', e); }
+            } catch (e) { console.error('Failed to load MCP server info:', e); }
         },
 
         async submitMcpServer() {
@@ -1824,18 +1824,18 @@ window.appData = function() {
                     this.allMcpServers = await fetchJSON('/mcp/servers') || [];
                     this.attachPanelView = 'manage-mcp-servers';
                 } else {
-                    alert(data.error || (isEdit ? '서버 수정 실패' : '서버 추가 실패'));
+                    alert(data.error || (isEdit ? 'Server update failed' : 'Server add failed'));
                 }
             } catch (e) {
-                console.error('MCP 서버 저장 실패:', e);
-                alert('서버 저장 중 오류가 발생했습니다.');
+                console.error('Failed to save MCP server:', e);
+                alert('An error occurred while saving the server.');
             } finally {
                 this.mcpServerAdding = false;
             }
         },
 
         async removeMcpServer(serverKey, serverName) {
-            if (!confirm(`'${serverName || serverKey}' 서버를 삭제하시겠습니까?`)) return;
+            if (!confirm(`Delete server '${serverName || serverKey}'?`)) return;
             try {
                 const resp = await fetch(`/mcp/servers/${encodeURIComponent(serverKey)}`, { method: 'DELETE' });
                 const data = await resp.json();
@@ -1844,14 +1844,14 @@ window.appData = function() {
                     this.allMcpServers = await fetchJSON('/mcp/servers') || [];
                     this.attachPanelView = 'manage-mcp-servers';
                 } else {
-                    alert(data.error || '서버 삭제 실패');
+                    alert(data.error || 'Server deletion failed');
                 }
             } catch (e) {
-                console.error('MCP 서버 삭제 실패:', e);
+                console.error('Failed to delete MCP server:', e);
             }
         },
 
-        // ==================== 공통 ====================
+        // ==================== Common ====================
 
         handleVisibilityChange() {
             if (document.visibilityState === 'visible') {
@@ -1896,7 +1896,7 @@ window.appData = function() {
                 if (data.success) {
                     this.fileModalContent = this.fileModalEditContent;
                     this.fileModalEditing = false;
-                    // 코드 하이라이팅 재생성
+                    // Regenerate code highlighting
                     const ext = this.fileModalPath.split('.').pop().toLowerCase();
                     if (ext !== 'md' && ext !== 'markdown') {
                         const content = this.fileModalContent;
@@ -1918,10 +1918,10 @@ window.appData = function() {
                         }
                     }
                 } else {
-                    alert(data.error || '저장에 실패했습니다.');
+                    alert(data.error || 'Save failed.');
                 }
             } catch(e) {
-                alert('저장 중 오류가 발생했습니다: ' + e.message);
+                alert('An error occurred while saving: ' + e.message);
             }
             this.fileModalSaving = false;
         },

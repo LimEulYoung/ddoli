@@ -1,10 +1,10 @@
 /**
- * Ddoli - 음성 인식 + Wake Word
+ * Ddoli - Voice Recognition + Wake Word
  * Alpine.js mixin: voiceMixin()
  */
 function voiceMixin() {
     return {
-        // 음성 인식 상태
+        // Voice recognition state
         voiceRecording: false,
         voiceText: '',
         voiceInterim: '',
@@ -12,13 +12,13 @@ function voiceMixin() {
         silenceTimer: null,
         submitKeywordDetected: false,
 
-        // Wake Word 상태
+        // Wake Word state
         wakeWordEnabled: false,
         wakeWordListening: false,
         wakeWordRecognition: null,
         wakeWordRestartTimer: null,
 
-        // ==================== 음성 인식 ====================
+        // ==================== Voice Recognition ====================
 
         startVoiceInput() {
             if (this.voiceRecording) return;
@@ -41,7 +41,7 @@ function voiceMixin() {
             const r = new SR();
             r.continuous = continuous;
             r.interimResults = true;
-            r.lang = 'ko-KR';
+            r.lang = 'en-US';
             return r;
         },
 
@@ -53,7 +53,7 @@ function voiceMixin() {
 
         startSpeechRecognition() {
             this.recognition = this._createRecognition(false);
-            if (!this.recognition) { alert('이 브라우저는 음성 인식을 지원하지 않습니다'); this.voiceRecording = false; return; }
+            if (!this.recognition) { alert('This browser does not support voice recognition'); this.voiceRecording = false; return; }
             this.recognition.onresult = (event) => {
                 const result = event.results[event.results.length - 1];
                 const transcript = result[0].transcript;
@@ -65,9 +65,9 @@ function voiceMixin() {
             this._recognitionRetryCount = 0;
             this.recognition.onerror = (event) => {
                 const e = event.error;
-                if (e === 'not-allowed') { alert('마이크 권한이 필요합니다. 브라우저 설정에서 마이크를 허용해주세요.'); this.cancelVoiceRecording(); }
-                else if (e === 'network') { this._recognitionRetryCount++; if (this._recognitionRetryCount >= 3) { alert('음성 인식 서버에 연결할 수 없습니다.'); this.cancelVoiceRecording(); } }
-                else if (e === 'service-not-available') { alert('음성 인식 서비스를 사용할 수 없습니다.'); this.cancelVoiceRecording(); }
+                if (e === 'not-allowed') { alert('Microphone permission is required. Please allow microphone access in browser settings.'); this.cancelVoiceRecording(); }
+                else if (e === 'network') { this._recognitionRetryCount++; if (this._recognitionRetryCount >= 3) { alert('Cannot connect to voice recognition server.'); this.cancelVoiceRecording(); } }
+                else if (e === 'service-not-available') { alert('Voice recognition service is unavailable.'); this.cancelVoiceRecording(); }
             };
             this.recognition.onend = () => this._restartRecognition(this.recognition, () => this.voiceRecording, () => this.cancelVoiceRecording());
             this.recognition.start();
@@ -79,7 +79,7 @@ function voiceMixin() {
         },
 
         checkAutoSubmit(text) {
-            const submitKW = ['전송해', '전송 해'], cancelKW = ['취소해', '취소 해', '취소'];
+            const submitKW = ['go ahead'], cancelKW = ['scratch that'];
             const t = text.toLowerCase().trim();
             if (cancelKW.some(k => t.includes(k))) { this.cancelVoiceRecording(); return; }
             if (submitKW.some(k => t.includes(k))) {
@@ -124,12 +124,12 @@ function voiceMixin() {
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
                     if (this.chatStreaming || this.codeStreaming || this.paperStreaming) {
-                        if (['취소해', '취소 해', '취소', '중단해', '중단', '그만'].some(k => transcript.includes(k))) {
+                        if (['scratch that'].some(k => transcript.toLowerCase().includes(k))) {
                             if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
                             this.stopStreaming(this.mode); return;
                         }
                     }
-                    if (transcript.includes('클로드')) {
+                    if (transcript.toLowerCase().includes('claude')) {
                         this.stopWakeWordListening();
                         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                         this.startVoiceInput(); return;
