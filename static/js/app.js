@@ -352,6 +352,21 @@ function renderMarkdown(text) {
     return text.replace(/\n/g, '<br>');
 }
 
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(ta);
+    return Promise.resolve();
+}
+
 function highlightCodeBlocks(container) {
     container.querySelectorAll('pre').forEach(pre => {
         if (pre.querySelector('.code-copy-btn')) return;
@@ -362,7 +377,7 @@ function highlightCodeBlocks(container) {
         btn.className = 'code-copy-btn';
         btn.innerHTML = icon('copy', 'w-4 h-4');
         btn.addEventListener('click', () => {
-            navigator.clipboard.writeText(code.textContent).then(() => {
+            copyText(code.textContent).then(() => {
                 btn.innerHTML = icon('check', 'w-4 h-4');
                 setTimeout(() => btn.innerHTML = icon('copy', 'w-4 h-4'), 1500);
             });
@@ -398,7 +413,7 @@ function appendRawContent(rawContent, text) {
 
 function bindCopyButton(btn, getText) {
     btn.addEventListener('click', function() {
-        navigator.clipboard.writeText(getText()).then(() => {
+        copyText(getText()).then(() => {
             this.innerHTML = icon('check', 'w-4 h-4 text-claude-accent');
             setTimeout(() => this.innerHTML = icon('copy'), 1500);
         });
@@ -954,12 +969,12 @@ window.appData = function() {
             if (!target) return;
             const cfg = MODE_CONFIG[target.mode];
             const base = target.mode === 'code' ? '~/workspace' : '~/papers';
-            navigator.clipboard.writeText(`${base}/${this[cfg.currentKey]}/${target.path}`);
+            copyText(`${base}/${this[cfg.currentKey]}/${target.path}`);
         },
 
         contextMenuCopyName() {
             const target = this._closeContextMenu();
-            if (target) navigator.clipboard.writeText(target.name);
+            if (target) copyText(target.name);
         },
 
         // ==================== Common methods ====================

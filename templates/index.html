@@ -455,7 +455,7 @@
                 <div class="flex items-center gap-2">
                     <span x-html="icon('mic', 'w-5 h-5 text-claude-text-secondary')"></span>
                     <span class="text-sm text-claude-text">Voice detection</span>
-                    <span class="text-xs text-claude-text-secondary">"Claude"</span>
+                    <span class="text-xs text-claude-text-secondary">"Hey Buddy"</span>
                 </div>
                 <button type="button" @click="toggleWakeWord()"
                     class="shrink-0 w-10 h-6 rounded-full transition-colors duration-200 relative cursor-pointer"
@@ -778,7 +778,7 @@
                                 <span x-html="icon('edit')"></span>
                                 <span>Edit</span>
                             </button>
-                            <button x-show="!fileModalMediaType || fileModalMediaType === 'markdown'" @click="navigator.clipboard.writeText(fileModalContent); let t = $el.querySelectorAll('span')[1]; t.textContent = 'Copied!'; setTimeout(() => t.textContent = 'Copy', 2000)" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors">
+                            <button x-show="!fileModalMediaType || fileModalMediaType === 'markdown'" @click="copyText(fileModalContent); let t = $el.querySelectorAll('span')[1]; t.textContent = 'Copied!'; setTimeout(() => t.textContent = 'Copy', 2000)" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors">
                                 <span x-html="icon('copy')"></span>
                                 <span>Copy</span>
                             </button>

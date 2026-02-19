@@ -129,7 +129,7 @@ function voiceMixin() {
                             this.stopStreaming(this.mode); return;
                         }
                     }
-                    if (transcript.toLowerCase().includes('claude')) {
+                    if (transcript.toLowerCase().includes('hey buddy')) {
                         this.stopWakeWordListening();
                         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
                         this.startVoiceInput(); return;
