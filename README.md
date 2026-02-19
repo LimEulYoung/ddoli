@@ -1,8 +1,8 @@
 # Ddoli
 
-AI assistant web app based on Claude Code. Supports chat, code editing, and paper writing modes.
+**Code and write papers from anywhere, on any device.**
 
-## Screenshots
+Ddoli is a mobile-friendly AI agent tool powered by Claude Code. Deploy it on your server and access a full development environment from your phone, tablet, or any browser — no local setup needed.
 
 <p align="center">
   <img src="docs/screenshots/chat-mode.jpg" alt="Chat Mode" width="250">
@@ -10,29 +10,33 @@ AI assistant web app based on Claude Code. Supports chat, code editing, and pape
   <img src="docs/screenshots/paper-mode.jpg" alt="Paper Mode" width="250">
 </p>
 
-## Requirements
+## Features
+
+- **Chat** — Ask questions, brainstorm ideas, or have a conversation with Claude
+- **Code** — Create projects, write and edit code, and run commands — all through Claude Code
+- **Paper** — Write LaTeX or Markdown papers with AI assistance and build PDFs instantly
+- **Terminal** — Full terminal access to your server via the browser
+- **Voice Input** — Speak to Claude using Web Speech API
+- **Mobile-first UI** — Designed to work seamlessly on phones and tablets
+
+## Quick Start
+
+### Requirements
 
 - Docker & Docker Compose
 - Claude account (Max subscription recommended)
 
-## Installation & Setup
-
-### 1. Clone
+### 1. Clone & Run
 
 ```bash
 git clone https://github.com/LimEulYoung/ddoli.git
 cd ddoli
-```
-
-### 2. Run
-
-```bash
 docker compose up -d
 ```
 
 The pre-built image will be pulled from Docker Hub on the first run.
 
-### 3. Claude CLI Login
+### 2. Claude CLI Login
 
 ```bash
 docker exec -it ddoli-app-1 bash
@@ -41,11 +45,11 @@ claude login
 
 When a browser authentication URL is displayed, copy it and open it in your local browser to authenticate.
 
-### 4. Access
+### 3. Access
 
 Open `http://<server-IP>:8000` in your browser.
 
-## Included Components
+## Tech Stack
 
 | Component | Purpose |
 |-----------|---------|
@@ -55,19 +59,3 @@ Open `http://<server-IP>:8000` in your browser.
 | LaTeX (texlive) | Paper PDF builds |
 | Chrome Headless | DevTools MCP connection |
 | Node.js 22 | Claude CLI & MCP stdio server |
-
-## Volumes
-
-| Volume | Path | Purpose |
-|--------|------|---------|
-| ddoli-claude-auth | /home/ddoli/.claude | Claude CLI auth credentials |
-| ddoli-chat | /home/ddoli/chat | Chat session data |
-| ddoli-workspace | /home/ddoli/workspace | Code projects |
-| ddoli-papers | /home/ddoli/papers | Paper projects |
-| ddoli-templates | /home/ddoli/paper-templates | Paper templates |
-| ddoli-pgdata | PostgreSQL data | Persistent DB storage |
-
-## Ports
-
-- `8000` — Web UI (required)
-- `9222` — Chrome DevTools (container-internal only)
