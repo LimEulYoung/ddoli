@@ -1,17 +1,17 @@
 # {paper_name}
 
-탐색적 학습을 위한 프로젝트. 주제를 깊이 파고들며 마크다운 문서로 정리한다.
+A project for exploratory learning. Dive deep into a topic and organize notes as Markdown documents.
 
-## 구조
+## Structure
 
-- `chapters/` — 챕터별 학습 내용 (`NN-slug.md` 형식)
-- `figures/` — 이미지, 다이어그램
+- `chapters/` — Chapter-by-chapter notes (`NN-slug.md` format)
+- `figures/` — Images, diagrams
 
-## 작성 규칙
+## Writing Rules
 
-- 모든 문서는 마크다운(.md)으로 작성
-- 수식: `$...$` (인라인), `$$...$$` (블록)
-- 코드 블록에 언어 태그 명시
-- 챕터 파일명은 번호순 유지 (`01-`, `02-`, ...)
-- 그림은 `figures/`에 저장, 상대경로로 참조
-- 빌드 과정 없음 — 마크다운 미리보기로 확인
+- All documents are written in Markdown (.md)
+- Math: `$...$` (inline), `$$...$$` (block)
+- Always specify language tags in code blocks
+- Keep chapter filenames numbered (`01-`, `02-`, ...)
+- Save figures in `figures/`, reference with relative paths
+- No build step — preview directly as Markdown

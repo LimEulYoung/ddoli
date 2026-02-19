@@ -1,60 +1,59 @@
-# {paper_name} - LaTeX 논문 프로젝트
+# {paper_name} - LaTeX Paper Project
 
-## 빌드 방법
+## Build
 
 ```bash
-# contents 폴더에서 빌드 (2번 실행하면 목차/참조가 제대로 반영됨)
+# Build from the contents folder (run twice for proper TOC/references)
 cd contents
 pdflatex main.tex
 pdflatex main.tex
 ```
 
-## PDF 보기
+## View PDF
 
-빌드 완료 후 사이드바에서 논문을 롱프레스 → "PDF 보기"로 `contents/main.pdf`를 바로 확인할 수 있습니다.
+After building, long-press the paper in the sidebar and select "View PDF" to open `contents/main.pdf`.
 
-## 파일 구조
+## File Structure
 
 ```
 {paper_name}/
-├── CLAUDE.md           # 이 파일 (빌드/배포 안내)
-├── contents/           # LaTeX 소스 파일
-│   ├── main.tex        # 메인 파일 (\input으로 섹션 연결)
-│   ├── abstract.tex    # 초록
-│   └── introduction.tex # 서론
-├── figures/            # 그림 파일
-└── references/         # 참고문헌 (PDF, BibTeX 등)
-    └── references.bib  # BibTeX 파일
+├── CLAUDE.md           # This file (build/usage guide)
+├── contents/           # LaTeX source files
+│   ├── main.tex        # Main file (connects sections via \input)
+│   ├── abstract.tex    # Abstract
+│   └── introduction.tex # Introduction
+├── figures/            # Image files
+└── references/         # References (PDF, BibTeX, etc.)
+    └── references.bib  # BibTeX file
 ```
 
-## 섹션 관리
+## Section Management
 
-각 섹션은 별도 .tex 파일로 관리하고, main.tex에서 `\input{섹션파일}` 로 연결합니다.
-새 섹션 추가 시:
-1. `contents/` 폴더에 `섹션명.tex` 파일 생성
-2. `main.tex`에 `\input{섹션명}` 추가
+Each section is managed as a separate .tex file and connected in main.tex via `\input{sectionfile}`.
+To add a new section:
+1. Create `sectionname.tex` in the `contents/` folder
+2. Add `\input{sectionname}` to `main.tex`
 
-## 참고문헌 추가
+## Adding References
 
-1. 사용자가 DOI나 논문 정보를 제공하면 `references/references.bib`에 BibTeX 엔트리 추가
-2. 참고 논문 PDF는 `references/` 폴더에 저장
-3. 본문에서 `\cite{key}` 형식으로 인용
+1. When the user provides a DOI or paper info, add a BibTeX entry to `references/references.bib`
+2. Save reference PDFs in the `references/` folder
+3. Cite in the body with `\cite{key}`
 
-## 그림 추가
+## Adding Figures
 
-1. 사용자가 이미지를 첨부하면 `figures/` 디렉토리에 저장
-2. 본문에서 아래와 같이 삽입:
+1. When the user attaches an image, save it to the `figures/` directory
+2. Insert in the body as follows:
 ```latex
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.8\textwidth]{../figures/filename.png}
-    \caption{그림 설명}
+    \caption{Figure description}
     \label{fig:label}
 \end{figure}
 ```
 
-## 주의사항
+## Notes
 
-- 빌드 오류 발생 시 `.log` 파일을 확인하여 원인 파악
-- 한글 사용 시 `\usepackage{kotex}` 필요 (이미 템플릿에 포함됨)
-- 빌드 산출물 (`.aux`, `.log`, `.out` 등)은 배포 시 제외
+- If build errors occur, check the `.log` file to identify the cause
+- Build artifacts (`.aux`, `.log`, `.out`, etc.) should be excluded from distribution

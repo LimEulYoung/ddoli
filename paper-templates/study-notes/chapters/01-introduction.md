@@ -1,3 +1,3 @@
-# 서론
+# Introduction
 
-여기에 학습 주제에 대한 서론을 작성합니다.
+Write an introduction to the study topic here.
