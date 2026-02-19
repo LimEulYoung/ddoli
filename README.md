@@ -16,13 +16,13 @@ git clone https://github.com/LimEulYoung/ddoli.git
 cd ddoli
 ```
 
-### 2. Build & Run
+### 2. Run
 
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
-The first build may take some time as it installs LaTeX, Chrome, Node.js, etc.
+The pre-built image will be pulled from Docker Hub on the first run.
 
 ### 3. Claude CLI Login
 
@@ -60,8 +60,8 @@ docker compose down
 # View logs
 docker compose logs -f app
 
-# Rebuild (after code changes)
-docker compose up --build -d
+# Update to latest version
+docker compose pull && docker compose up -d
 
 # Full reset (delete DB and volumes)
 docker compose down -v

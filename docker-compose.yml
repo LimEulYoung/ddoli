@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: limeulyoung/ddoli:latest
     ports:
       - "8000:8000"
     environment:
