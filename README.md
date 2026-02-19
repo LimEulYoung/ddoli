@@ -2,6 +2,14 @@
 
 AI assistant web app based on Claude Code. Supports chat, code editing, and paper writing modes.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/chat-mode.jpg" alt="Chat Mode" width="250">
+  <img src="docs/screenshots/code-mode.jpg" alt="Code Mode" width="250">
+  <img src="docs/screenshots/paper-mode.jpg" alt="Paper Mode" width="250">
+</p>
+
 ## Requirements
 
 - Docker & Docker Compose
