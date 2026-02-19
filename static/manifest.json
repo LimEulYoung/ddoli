@@ -1,0 +1,18 @@
+{
+  "name": "ddori",
+  "short_name": "ddori",
+  "description": "AI 채팅 & 코드 어시스턴트",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF9F7",
+  "theme_color": "#D97757",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/static/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

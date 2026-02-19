@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ddori</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="manifest" href="/static/manifest.json">
+
+    <!-- PWA 메타 태그 -->
+    <meta name="theme-color" content="#D97757">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ddori">
+    <link rel="apple-touch-icon" href="/static/favicon.svg">
+
+    <!-- Pretendard 폰트 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        claude: {
+                            bg: '#FAF9F7',
+                            sidebar: '#EAE6DF',
+                            'icon-bar': '#E0DBD4',
+                            'icon-bar-hover': '#D4CFC7',
+                            accent: '#DA7756',
+                            'accent-hover': '#C4654A',
+                            text: '#1F1F1E',
+                            'text-secondary': '#4A4A48',
+                            border: '#E5E0D9',
+                            'input-bg': '#FFFFFF',
+                            'user-msg': '#F0EBE3',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+
+    <!-- App JS (Alpine 상태 + 유틸리티) -->
+    <script src="/static/js/voice.js"></script>
+    <script src="/static/js/terminal.js"></script>
+    <script src="/static/js/app.js"></script>
+
+    <!-- Marked.js + Highlight.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- PDF.js 5.x (ES module) -->
+    <script type="module">
+        import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.624/build/pdf.worker.min.mjs';
+        window.pdfjsLib = pdfjsLib;
+    </script>
+
+    <!-- App CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+
+<body class="bg-claude-bg h-screen font-sans text-claude-text" x-data="appData()"
+      @dragover.prevent="dragOver = true"
+      @dragenter.prevent="dragOverCount++; dragOver = true"
+      @dragleave.prevent="dragOverCount--; if (dragOverCount <= 0) { dragOver = false; dragOverCount = 0; }"
+      @drop.prevent="handleDrop($event)">
+
+    <!-- 드래그 앤 드롭 전체 화면 오버레이 -->
+    <div x-cloak x-show="dragOver" class="fixed inset-0 bg-claude-accent/10 border-4 border-dashed border-claude-accent z-50 flex items-center justify-center pointer-events-none">
+        <div class="bg-claude-bg/90 backdrop-blur-sm rounded-2xl px-8 py-6 text-center">
+            <svg class="w-10 h-10 mx-auto mb-2 text-claude-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            <span class="text-claude-accent font-medium">파일을 놓아주세요</span>
+        </div>
+    </div>
+
+    <div class="flex h-full">
+
+        <!-- 모바일 오버레이 배경 -->
+        <div x-cloak x-show="sidebarOpen" x-transition.opacity.duration.300ms @click="sidebarOpen = false" class="fixed inset-0 bg-black bg-opacity-50 z-20"></div>
+
+        <!-- 사이드바 -->
+        <aside
+            x-cloak x-show="sidebarOpen"
+            x-transition:enter="transition-all ease-out duration-300"
+            x-transition:enter-start="-translate-x-full"
+            x-transition:enter-end="translate-x-0"
+            x-transition:leave="transition-all ease-in duration-200"
+            x-transition:leave-start="translate-x-0"
+            x-transition:leave-end="-translate-x-full"
+            class="bg-claude-sidebar text-claude-text shrink-0 fixed inset-y-0 left-0 z-30 w-72"
+        >
+            <div class="h-full flex flex-col">
+
+                <!-- 사이드바 헤더 -->
+                <div class="p-3 border-b border-claude-border">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-base font-semibold">ddori</h2>
+                        <button @click="sidebarOpen = false" class="p-1.5 text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded-lg">
+                            <span x-html="icon('close', 'w-5 h-5')"></span>
+                        </button>
+                    </div>
+
+                    <!-- 모드 선택 탭 -->
+                    <div class="flex gap-1">
+                        <button
+                            @click="mode = 'chat'; loadMcpTools()"
+                            :class="mode === 'chat' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'"
+                            class="flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span x-html="icon('chat', 'w-3.5 h-3.5')"></span>
+                            채팅
+                        </button>
+                        <button
+                            @click="switchToCodeMode()"
+                            :class="mode === 'code' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'"
+                            class="flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span x-html="icon('code', 'w-3.5 h-3.5')"></span>
+                            코드
+                        </button>
+                        <button
+                            @click="switchToPaperMode()"
+                            :class="mode === 'paper' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'"
+                            class="flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
+                        >
+                            <span x-html="icon('file', 'w-3.5 h-3.5')"></span>
+                            논문
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 채팅 모드 사이드바 -->
+                <div x-show="mode === 'chat'" class="flex-1 flex flex-col overflow-hidden">
+                    <div class="p-3 border-b border-claude-border">
+                        <button @click="newChatSession()" class="w-full py-2 px-3 bg-claude-border hover:bg-claude-icon-bar-hover rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                            <span x-html="icon('plus')"></span>
+                            새 대화
+                        </button>
+                    </div>
+                    <nav class="text-sm flex-1 overflow-y-auto p-2">
+                        <template x-if="chatSessions.length === 0">
+                            <div class="px-2 py-4 text-claude-text-secondary text-xs text-center">대화 기록이 없습니다</div>
+                        </template>
+                        <template x-for="session in chatSessions" :key="session.id">
+                            <div @click="selectChatSession(session)"
+                                 @touchstart="startLongPress($event, 'chat', session.id)"
+                                 @touchend="endLongPress($event)"
+                                 @touchmove="cancelLongPress()"
+                                 @contextmenu.prevent
+                                 :class="chatSessionId === session.id ? 'bg-claude-border' : 'hover:bg-claude-border'"
+                                 class="group flex items-center px-3 py-2 rounded-lg cursor-pointer select-none">
+                                <span class="truncate flex-1" x-text="session.title"></span>
+                                <button @click.stop="openFileContextMenu($event, 'chat', session.id)" class="hidden sm:block opacity-0 group-hover:opacity-100 p-0.5 text-claude-text-secondary hover:text-claude-text rounded transition-opacity shrink-0" title="더보기">
+                                    <span x-html="icon('more', 'w-3.5 h-3.5')"></span>
+                                </button>
+                            </div>
+                        </template>
+                    </nav>
+                    <!-- 도구 영역 (하단 고정) -->
+                    <div class="border-t border-claude-border">
+                        <div x-cloak x-show="showToolsMenu"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1"
+                            x-transition:enter-end="opacity-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 translate-y-0"
+                            x-transition:leave-end="opacity-0 -translate-y-1"
+                            class="border-b border-claude-border">
+                            <button @click="deleteAllChatSessions()"
+                                class="w-full flex items-center gap-3 px-5 py-2.5 text-sm text-red-500/80 hover:text-red-500 hover:bg-red-500/5 transition-colors">
+                                <span x-html="icon('trash', 'w-4 h-4')"></span>
+                                전체 대화 삭제
+                            </button>
+                        </div>
+                        <button @click="showToolsMenu = !showToolsMenu" class="w-full flex items-center gap-2 px-3 py-2.5 text-claude-text-secondary hover:text-claude-text transition-colors text-sm">
+                            <span x-html="icon('settings', 'w-5 h-5')"></span>
+                            도구
+                            <svg class="w-3.5 h-3.5 ml-auto transition-transform duration-150" :class="showToolsMenu && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 코드/Paper 모드 사이드바 (통합) -->
+                <template x-for="m in [{k:'code', cur:'currentProject', list:'projects', label:'프로젝트', listLabel:'작업 디렉토리', icon:'folder', treeId:'file-tree', treeContentId:'file-tree-content', filesUrl:'/code/files?project='}, {k:'paper', cur:'currentPaper', list:'papers', label:'논문', listLabel:'논문 목록', icon:'file', treeId:'paper-file-tree', treeContentId:'paper-file-tree-content', filesUrl:'/paper/files?paper='}]" :key="m.k">
+                    <div x-show="mode === m.k" class="flex-1 flex flex-col h-full overflow-hidden">
+                        <div class="p-3 border-b border-claude-border flex gap-2">
+                            <button @click="m.k==='code' ? (showNewProjectModal=true,newProjectName='') : (showNewPaperModal=true,newPaperName='',selectedTemplate=paperTemplates.length?paperTemplates[0].value:'',paperNameError='')" class="flex-1 py-2 px-3 bg-claude-border hover:bg-claude-icon-bar-hover rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                                <span x-html="icon('plus')"></span>
+                                <span x-text="'새 ' + m.label"></span>
+                            </button>
+                            <button x-show="$data[m.cur]" @click="_clearSession(m.k)" class="py-2 px-3 bg-claude-border hover:bg-claude-icon-bar-hover rounded-lg text-sm transition-colors" title="새 세션">
+                                <span x-html="icon('refresh')"></span>
+                            </button>
+                        </div>
+                        <div class="p-3 border-b border-claude-border">
+                            <div class="text-xs text-claude-text-secondary mb-2" x-text="m.listLabel"></div>
+                            <div :id="m.k + '-list'" class="space-y-1 max-h-32 overflow-y-auto">
+                                <template x-if="$data[m.list].length === 0">
+                                    <div class="text-xs text-claude-text-secondary py-2" x-text="m.label + ' 없음'"></div>
+                                </template>
+                                <template x-for="item in $data[m.list]" :key="m.k === 'code' ? item : item.name">
+                                    <div @click="_selectItem(m.k, item)"
+                                         @touchstart="startLongPress($event, m.k === 'code' ? 'project' : 'paper', item)"
+                                         @touchend="endLongPress($event)" @touchmove="cancelLongPress()" @contextmenu.prevent
+                                         :class="$data[m.cur] === (m.k === 'code' ? item : item.name) ? 'bg-claude-accent/10 text-claude-accent border-claude-accent/30' : 'hover:bg-claude-border'"
+                                         class="group w-full text-left px-2 py-1.5 rounded text-sm flex items-center gap-2 border border-transparent transition-colors cursor-pointer select-none">
+                                        <span x-html="icon(m.icon, 'w-4 h-4 shrink-0')"></span>
+                                        <span class="truncate flex-1" x-text="m.k === 'code' ? item : item.name"></span>
+                                        <button @click.stop="openFileContextMenu($event, m.k === 'code' ? 'project' : 'paper', item)" class="hidden sm:block opacity-0 group-hover:opacity-100 p-0.5 text-claude-text-secondary hover:text-claude-text rounded transition-opacity shrink-0" title="더보기">
+                                            <span x-html="icon('more', 'w-3.5 h-3.5')"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="flex-1 flex flex-col overflow-hidden">
+                            <div class="p-3 border-b border-claude-border flex items-center justify-between">
+                                <div class="text-xs text-claude-text-secondary">파일 탐색기</div>
+                                <button x-show="$data[m.cur]" @click="openCreateModal(m.k)" class="p-1 text-claude-text-secondary hover:text-claude-accent hover:bg-claude-border rounded transition-colors" title="새로 만들기">
+                                    <span x-html="icon('plus', 'w-4 h-4')"></span>
+                                </button>
+                            </div>
+                            <div :id="m.treeId" class="flex-1 overflow-y-auto p-2 text-sm" x-show="$data[m.cur]" x-effect="if($data[m.cur]) { htmx.ajax('GET', m.filesUrl + $data[m.cur], {target: '#' + m.treeContentId, swap: 'innerHTML'}) }">
+                                <div :id="m.treeContentId"></div>
+                            </div>
+                            <div class="flex-1 flex items-center justify-center text-claude-text-secondary text-sm" x-show="!$data[m.cur]" x-text="m.label + '을(를) 선택하세요'"></div>
+                        </div>
+                        <!-- 도구 영역 (하단 고정) -->
+                        <div class="border-t border-claude-border">
+                            <div x-cloak x-show="showToolsMenu"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 -translate-y-1"
+                                x-transition:enter-end="opacity-100 translate-y-0"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 translate-y-0"
+                                x-transition:leave-end="opacity-0 -translate-y-1"
+                                class="border-b border-claude-border">
+                                <template x-if="m.k === 'code'">
+                                    <button @click="showToolsMenu = false; openTerminal()"
+                                        class="w-full flex items-center gap-3 px-5 py-2.5 text-sm text-claude-text-secondary hover:bg-claude-icon-bar transition-colors">
+                                        <span x-html="icon('terminal', 'w-4 h-4')"></span>
+                                        터미널
+                                    </button>
+                                </template>
+                                <button @click="showToolsMenu = false; openArchiveModal(m.k)"
+                                    class="w-full flex items-center gap-3 px-5 py-2.5 text-sm text-claude-text-secondary hover:bg-claude-icon-bar transition-colors">
+                                    <span x-html="icon('folder', 'w-4 h-4')"></span>
+                                    아카이브
+                                </button>
+                            </div>
+                            <button @click="showToolsMenu = !showToolsMenu" class="w-full flex items-center gap-2 px-3 py-2.5 text-claude-text-secondary hover:text-claude-text transition-colors text-sm">
+                                <span x-html="icon('settings', 'w-5 h-5')"></span>
+                                도구
+                                <span class="ml-auto transition-transform duration-150" :class="showToolsMenu && 'rotate-180'" x-html="icon('chevronUp', 'w-3.5 h-3.5')"></span>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
+            </div>
+        </aside>
+
+        <!-- 메인 컨텐츠 영역 -->
+        <main class="flex-1 flex flex-col min-h-0 overflow-x-hidden overflow-y-auto">
+
+            <!-- 헤더 -->
+            <header class="bg-claude-bg border-b border-claude-border px-4 py-3 flex items-center gap-3">
+                <button @click="sidebarOpen = !sidebarOpen" class="p-2 -ml-2 text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded-lg">
+                    <span x-html="icon('menu', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-xs font-medium px-2 py-1 rounded-full shrink-0 bg-claude-accent/10 text-claude-accent"
+                      x-text="mode === 'chat' ? '채팅' : (mode === 'paper' ? '논문' : '코드')"></span>
+                <template x-if="mode === 'chat'">
+                    <h1 id="session-title" class="text-lg font-semibold text-claude-text truncate min-w-0">새 대화</h1>
+                </template>
+                <template x-if="mode === 'code'">
+                    <h1 class="text-lg font-semibold text-claude-text truncate min-w-0">
+                        <span x-show="!currentProject" class="text-claude-text-secondary">프로젝트를 선택하세요</span>
+                        <span x-show="currentProject" x-text="currentProject"></span>
+                    </h1>
+                </template>
+                <template x-if="mode === 'paper'">
+                    <h1 class="text-lg font-semibold text-claude-text truncate min-w-0">
+                        <span x-show="!currentPaper" class="text-claude-text-secondary">논문을 선택하세요</span>
+                        <span x-show="currentPaper" x-text="currentPaper"></span>
+                    </h1>
+                </template>
+                <div x-cloak x-show="currentContextPercent() > 0 && (mode === 'chat' || (mode === 'code' && currentProject) || (mode === 'paper' && currentPaper))" class="ml-auto flex items-center gap-2 shrink-0">
+                    <div class="text-xs text-claude-text-secondary">컨텍스트</div>
+                    <div class="w-12 h-2 bg-claude-border rounded-full overflow-hidden">
+                        <div class="h-full bg-claude-accent transition-all duration-300" :style="'width: ' + Math.min(currentContextPercent(), 100) + '%'"></div>
+                    </div>
+                    <div class="text-xs font-medium text-claude-accent" x-text="currentContextPercent() + '%'"></div>
+                </div>
+            </header>
+
+            <!-- 채팅 모드 -->
+            <div x-show="mode === 'chat'" x-cloak class="flex-1 flex flex-col min-h-0">
+                <!-- 환영 메시지 (메시지 없을 때) -->
+                <div x-show="!chatHasMessages" class="flex-1 flex items-center justify-center p-4">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-claude-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span x-html="icon('chat', 'w-8 h-8 text-claude-accent')"></span>
+                        </div>
+                        <h2 class="text-xl font-semibold text-claude-text mb-2">무엇을 도와드릴까요?</h2>
+                        <p class="text-claude-text-secondary">질문하거나 대화를 시작해보세요</p>
+                    </div>
+                </div>
+                <!-- 메시지 영역 (메시지 있을 때) -->
+                <div x-show="chatHasMessages" class="flex-1 overflow-y-auto">
+                    <div id="chat-messages-inner" class="max-w-3xl mx-auto p-4 space-y-4 overflow-x-hidden"></div>
+                </div>
+            </div>
+
+            <!-- 코드 모드 -->
+            <div x-show="mode === 'code'" x-cloak class="flex-1 flex flex-col min-h-0">
+                <!-- 프로젝트 미선택 시 -->
+                <div x-show="!currentProject" class="flex-1 flex items-center justify-center p-4 pb-24">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-claude-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span x-html="icon('folder', 'w-8 h-8 text-claude-accent')"></span>
+                        </div>
+                        <h3 class="text-lg font-medium text-claude-text mb-2">어디서나 코딩하자</h3>
+                        <p class="text-claude-text-secondary mb-4">왼쪽 + 버튼을 눌러 새 프로젝트를 만드세요</p>
+                        <button @click="showNewProjectModal = true; newProjectName = ''" class="px-4 py-2 bg-claude-accent text-white rounded-lg hover:bg-claude-accent-hover transition-colors">
+                            새 프로젝트 만들기
+                        </button>
+                    </div>
+                </div>
+                <!-- 코드 메시지 영역 -->
+                <div x-show="currentProject" class="flex-1 overflow-y-auto min-h-0">
+                    <div id="code-messages" class="max-w-3xl mx-auto p-4 space-y-4 overflow-x-hidden"></div>
+                </div>
+            </div>
+
+            <!-- Paper 모드 -->
+            <div x-show="mode === 'paper'" x-cloak class="flex-1 flex flex-col min-h-0">
+                <!-- 논문 미선택 시 -->
+                <div x-show="!currentPaper" class="flex-1 flex items-center justify-center p-4 pb-24">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-claude-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span x-html="icon('file', 'w-8 h-8 text-claude-accent')"></span>
+                        </div>
+                        <h3 class="text-lg font-medium text-claude-text mb-2">어디서나 논문쓰자</h3>
+                        <p class="text-claude-text-secondary mb-4">왼쪽 + 버튼을 눌러 새 논문을 시작하세요</p>
+                        <button @click="showNewPaperModal = true; newPaperName = ''; selectedTemplate = paperTemplates.length ? paperTemplates[0].value : ''; paperNameError = ''" class="px-4 py-2 bg-claude-accent text-white rounded-lg hover:bg-claude-accent-hover transition-colors">
+                            새 논문 시작하기
+                        </button>
+                    </div>
+                </div>
+                <!-- Paper 메시지 영역 -->
+                <div x-show="currentPaper" class="flex-1 overflow-y-auto min-h-0">
+                    <div id="paper-messages" class="max-w-3xl mx-auto p-4 space-y-4 overflow-x-hidden"></div>
+                </div>
+            </div>
+
+            <!-- 통합 입력창 -->
+            <div class="bg-claude-bg p-4" x-show="mode === 'chat' || (mode === 'code' && currentProject) || (mode === 'paper' && currentPaper)">
+                <div class="max-w-3xl mx-auto relative" x-ref="messageInput">
+                    <form @submit.prevent="submitMessage()">
+                        <div class="rounded-2xl bg-claude-input-bg overflow-hidden ring-1 ring-claude-border transition-shadow focus-within:ring-2 focus-within:ring-claude-accent">
+                            <!-- 첨부 파일 미리보기 -->
+                            <div x-show="attachedFiles.length > 0" class="flex flex-wrap gap-2 px-3 pt-3">
+                                <template x-for="file in attachedFiles" :key="file.id">
+                                    <div class="relative group flex items-center gap-1.5 bg-claude-sidebar rounded-lg px-2 py-1.5 text-xs text-claude-text max-w-[180px]">
+                                        <template x-if="file.type === 'image' && file.previewUrl">
+                                            <img :src="file.previewUrl" class="w-8 h-8 rounded object-cover shrink-0">
+                                        </template>
+                                        <template x-if="file.type !== 'image'">
+                                            <span x-html="icon('file', 'w-4 h-4 text-claude-text-secondary shrink-0')"></span>
+                                        </template>
+                                        <span class="truncate" x-text="file.shortName"></span>
+                                        <button type="button" @click="removeAttachment(file.id)" class="shrink-0 p-0.5 text-claude-text-secondary hover:text-red-500 rounded transition-colors">
+                                            <span x-html="icon('close', 'w-3.5 h-3.5')"></span>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                            <textarea x-ref="messageTextarea" name="message" x-model="message" placeholder="메시지를 입력하세요..." rows="1" class="w-full px-4 pt-3 pb-0 focus:outline-none bg-transparent text-claude-text resize-none" style="max-height: 40vh;" autocomplete="off" @input="autoResize($el)" @keydown.enter="handleEnter($event, $el, mode === 'chat' ? 'chatStreaming' : 'codeStreaming')" @paste="handlePaste($event)"></textarea>
+                            <div class="flex items-center justify-between px-2 pb-2">
+                                <div class="flex items-center gap-1">
+                                    <button type="button" @click="toggleAttachPanel('messageInput')" :class="attachPanelOpen ? 'bg-claude-border text-claude-text' : 'text-claude-text-secondary hover:text-claude-text hover:bg-claude-border'" class="p-1.5 rounded-lg transition-colors" title="첨부">
+                                        <span class="transition-transform duration-200 inline-block" :class="attachPanelOpen ? 'rotate-45' : ''" x-html="icon('plus', 'w-5 h-5')"></span>
+                                    </button>
+                                    <!-- 음성 입력 버튼 -->
+                                    <div class="relative">
+                                        <button type="button" @click="startVoiceInput()" class="p-1.5 rounded-lg transition-colors text-claude-text-secondary hover:text-claude-text hover:bg-claude-border" title="음성 입력">
+                                            <span x-html="icon('mic', 'w-5 h-5')"></span>
+                                        </button>
+                                        <div x-cloak x-show="wakeWordEnabled && wakeWordListening && !voiceRecording"
+                                             class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5">
+                                            <div class="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-75"></div>
+                                            <div class="relative w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                                        </div>
+                                    </div>
+                                    <span class="text-[10px] font-medium text-claude-text-secondary/60 uppercase tracking-wide" x-text="selectedModel"></span>
+                                </div>
+                                <button x-show="!(mode === 'chat' ? chatStreaming : mode === 'code' ? codeStreaming : paperStreaming)" x-cloak type="submit" :disabled="!message.trim()" :class="message.trim() ? 'bg-claude-accent hover:bg-claude-accent-hover text-white' : 'bg-claude-border text-claude-text-secondary cursor-not-allowed'" class="p-1.5 rounded-lg transition-colors" title="전송">
+                                    <span x-html="icon('send', 'w-5 h-5')"></span>
+                                </button>
+                                <button x-show="mode === 'chat' ? chatStreaming : mode === 'code' ? codeStreaming : paperStreaming" x-cloak type="button" @click="stopStreaming(mode)" class="p-1.5 rounded-lg transition-colors bg-red-500 hover:bg-red-600 text-white" title="중단">
+                                    <span x-html="icon('stop', 'w-5 h-5')"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+
+    <!-- 첨부 패널 (공용) -->
+    <div
+        x-cloak x-show="attachPanelOpen"
+        @click.outside="attachPanelOpen = false; attachPanelView = 'main'"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-4"
+        class="fixed bg-white rounded-xl border border-claude-border shadow-lg overflow-hidden z-40"
+        :style="attachPanelStyle"
+    >
+        <!-- 메인 뷰 -->
+        <div x-show="attachPanelView === 'main'" class="p-3">
+            <div class="grid grid-cols-3 gap-2 mb-3">
+                <template x-for="item in attachItems" :key="item.label">
+                    <button type="button" @click="$data[item.action]()" class="flex flex-col items-center justify-center gap-1 py-3 rounded-xl border border-claude-border hover:bg-claude-sidebar transition-colors">
+                        <span x-html="item.icon"></span>
+                        <span class="text-xs text-claude-text" x-text="item.label"></span>
+                    </button>
+                </template>
+            </div>
+            <div class="border-t border-claude-border my-2"></div>
+            <!-- 음성 감지 토글 -->
+            <div class="flex items-center justify-between px-2 py-2">
+                <div class="flex items-center gap-2">
+                    <span x-html="icon('mic', 'w-5 h-5 text-claude-text-secondary')"></span>
+                    <span class="text-sm text-claude-text">음성 감지</span>
+                    <span class="text-xs text-claude-text-secondary">"클로드"</span>
+                </div>
+                <button type="button" @click="toggleWakeWord()"
+                    class="shrink-0 w-10 h-6 rounded-full transition-colors duration-200 relative cursor-pointer"
+                    :class="wakeWordEnabled ? 'bg-claude-accent' : 'bg-claude-border'">
+                    <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                         :class="wakeWordEnabled ? 'left-5' : 'left-1'"></div>
+                </button>
+            </div>
+            <!-- 모델 선택 -->
+            <div class="border-t border-claude-border my-2"></div>
+            <div class="flex items-center justify-between px-2 py-2">
+                <div class="flex items-center gap-2">
+                    <span x-html="icon('monitor', 'w-5 h-5 text-claude-text-secondary')"></span>
+                    <span class="text-sm text-claude-text">모델</span>
+                </div>
+                <div class="flex gap-1">
+                    <template x-for="opt in modelOptions" :key="opt.value">
+                        <button type="button" @click="setModel(opt.value)"
+                            :class="selectedModel === opt.value ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'"
+                            class="px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                            x-text="opt.label">
+                        </button>
+                    </template>
+                </div>
+            </div>
+            <div class="border-t border-claude-border my-2"></div>
+            <button type="button" @click="attachPanelView = 'tools'" class="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-claude-sidebar transition-colors">
+                <div class="flex items-center gap-2">
+                    <span x-html="icon('settings', 'w-5 h-5 text-claude-text-secondary')"></span>
+                    <span class="text-sm text-claude-text">도구</span>
+                    <span x-show="mcpTools.filter(t => t.enabled).length > 0" x-text="mcpTools.filter(t => t.enabled).length" class="text-xs bg-claude-accent text-white rounded-full px-1.5 py-0.5 min-w-[20px] text-center"></span>
+                </div>
+                <span x-html="icon('chevronRight', 'w-4 h-4 text-claude-text-secondary')"></span>
+            </button>
+            <button type="button" @click="attachPanelView = 'commands'" class="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-claude-sidebar transition-colors">
+                <div class="flex items-center gap-2">
+                    <span x-html="icon('command', 'w-5 h-5 text-claude-text-secondary')"></span>
+                    <span class="text-sm text-claude-text">명령어</span>
+                </div>
+                <span x-html="icon('chevronRight', 'w-4 h-4 text-claude-text-secondary')"></span>
+            </button>
+        </div>
+        <!-- 명령어 뷰 -->
+        <div x-show="attachPanelView === 'commands'" class="p-3">
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" @click="attachPanelView = 'main'" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-sm font-medium text-claude-text">명령어</span>
+            </div>
+            <div class="max-h-48 overflow-y-auto space-y-1">
+                <template x-if="commands.length === 0">
+                    <div class="text-sm text-claude-text-secondary text-center py-4">등록된 명령어가 없습니다</div>
+                </template>
+                <template x-for="cmd in commands" :key="cmd.id">
+                    <div @click="insertCommand(cmd)"
+                         @touchstart="startLongPress($event, 'command', cmd)"
+                         @touchend="endLongPress($event)"
+                         @touchmove="cancelLongPress()"
+                         @contextmenu.prevent
+                         class="group flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-claude-sidebar cursor-pointer select-none">
+                        <span x-html="icon('chevronRight', 'w-4 h-4 text-claude-accent shrink-0')"></span>
+                        <span class="text-sm text-claude-text truncate flex-1" x-text="cmd.name"></span>
+                        <button @click.stop="openFileContextMenu($event, 'command', cmd)" class="hidden sm:block opacity-0 group-hover:opacity-100 p-0.5 text-claude-text-secondary hover:text-claude-text rounded transition-opacity shrink-0" title="더보기">
+                            <span x-html="icon('more', 'w-3.5 h-3.5')"></span>
+                        </button>
+                    </div>
+                </template>
+            </div>
+            <div class="border-t border-claude-border mt-2 pt-2">
+                <button type="button" @click="openNewCommandModal()" class="w-full flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-claude-accent hover:bg-claude-accent/10 transition-colors">
+                    <span x-html="icon('plus')"></span>
+                    <span class="text-sm">새 명령어 추가</span>
+                </button>
+            </div>
+        </div>
+        <!-- 도구 뷰 (서버 목록) -->
+        <div x-show="attachPanelView === 'tools'" class="p-3">
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" @click="attachPanelView = 'main'" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-sm font-medium text-claude-text">도구</span>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1">
+                <template x-if="mcpServers.length === 0">
+                    <div class="text-sm text-claude-text-secondary text-center py-4">사용 가능한 도구가 없습니다</div>
+                </template>
+                <template x-for="server in mcpServers" :key="server.name">
+                    <button type="button" @click="selectMcpServer(server.name)" class="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-claude-sidebar transition-colors">
+                        <div class="flex items-center gap-2">
+                            <span x-html="icon('settings', 'w-5 h-5 text-claude-text-secondary')"></span>
+                            <span class="text-sm text-claude-text" x-text="server.name"></span>
+                            <span x-show="server.enabled > 0" x-text="server.enabled" class="text-xs bg-claude-accent text-white rounded-full px-1.5 py-0.5 min-w-[20px] text-center"></span>
+                        </div>
+                        <span x-html="icon('chevronRight', 'w-4 h-4 text-claude-text-secondary')"></span>
+                    </button>
+                </template>
+            </div>
+            <div class="border-t border-claude-border mt-2 pt-2">
+                <button type="button" @click="openManageMcpServers()" class="w-full flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-claude-accent hover:bg-claude-accent/10 transition-colors">
+                    <span x-html="icon('settings')"></span>
+                    <span class="text-sm">MCP 서버 관리</span>
+                </button>
+            </div>
+        </div>
+        <!-- MCP 서버 관리 뷰 -->
+        <div x-show="attachPanelView === 'manage-mcp-servers'" class="p-3">
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" @click="attachPanelView = 'tools'" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-sm font-medium text-claude-text">MCP 서버 관리</span>
+            </div>
+            <!-- 기존 서버 목록 (모드 무관 전체) -->
+            <div x-show="allMcpServers.length > 0" class="space-y-1 mb-3">
+                <template x-for="server in allMcpServers" :key="server.key">
+                    <button type="button" @click="openEditMcpServer(server.key)"
+                        class="w-full flex items-center justify-between px-2 py-2.5 rounded-lg hover:bg-claude-sidebar transition-colors">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span x-html="icon('settings', 'w-4 h-4 text-claude-text-secondary shrink-0')"></span>
+                            <span class="text-sm text-claude-text truncate" x-text="server.name"></span>
+                        </div>
+                        <span x-html="icon('chevronRight', 'w-4 h-4 text-claude-text-secondary shrink-0')"></span>
+                    </button>
+                </template>
+            </div>
+            <div class="border-t border-claude-border pt-2">
+                <button type="button" @click="openAddMcpServer()" class="w-full flex items-center justify-center gap-2 px-2 py-2 rounded-lg text-claude-accent hover:bg-claude-accent/10 transition-colors">
+                    <span x-html="icon('plus')"></span>
+                    <span class="text-sm">새 서버 추가</span>
+                </button>
+            </div>
+        </div>
+        <!-- MCP 서버 추가/수정 뷰 -->
+        <div x-show="attachPanelView === 'edit-mcp-server'" class="p-3">
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" @click="attachPanelView = 'manage-mcp-servers'" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-sm font-medium text-claude-text" x-text="mcpServerEditMode === 'add' ? 'MCP 서버 추가' : 'MCP 서버 수정'"></span>
+            </div>
+            <div class="space-y-3 max-h-[50vh] overflow-y-auto">
+                <div>
+                    <label class="text-xs text-claude-text-secondary mb-1 block">이름 (영문, 숫자, _, -)</label>
+                    <input type="text" :value="newMcpServer.name" :disabled="mcpServerEditMode === 'edit'" placeholder="example_mcp"
+                        @input="let v = $event.target.value.replace(/[^a-zA-Z0-9_\-]/g, ''); newMcpServer.name = v; if ($event.target.value !== v) $event.target.value = v"
+                        :class="mcpServerEditMode === 'edit' ? 'opacity-50 cursor-not-allowed' : ''"
+                        class="w-full border border-claude-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-xs text-claude-text-secondary mb-1 block">타입</label>
+                    <div class="flex gap-2">
+                        <button type="button" @click="newMcpServer.type = 'sse'"
+                            :class="newMcpServer.type === 'sse' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary'"
+                            class="flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors">SSE</button>
+                        <button type="button" @click="newMcpServer.type = 'stdio'"
+                            :class="newMcpServer.type === 'stdio' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary'"
+                            class="flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors">Stdio</button>
+                    </div>
+                </div>
+                <template x-if="newMcpServer.type === 'sse'">
+                    <div>
+                        <label class="text-xs text-claude-text-secondary mb-1 block">URL</label>
+                        <input type="url" x-model="newMcpServer.url" placeholder="https://example.com/sse" class="w-full border border-claude-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text" autocomplete="off">
+                    </div>
+                </template>
+                <template x-if="newMcpServer.type === 'stdio'">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-xs text-claude-text-secondary mb-1 block">명령어</label>
+                            <input type="text" x-model="newMcpServer.command" placeholder="npx" class="w-full border border-claude-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text" autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="text-xs text-claude-text-secondary mb-1 block">인자 (줄바꿈 구분)</label>
+                            <textarea x-model="newMcpServer.argsText" placeholder="server-package@latest&#10;--port&#10;3000" rows="3" class="w-full border border-claude-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text resize-none"></textarea>
+                        </div>
+                    </div>
+                </template>
+                <div>
+                    <label class="text-xs text-claude-text-secondary mb-1 block">모드</label>
+                    <div class="flex gap-2">
+                        <template x-for="m in ['chat', 'code', 'paper']" :key="m">
+                            <button type="button" @click="newMcpServer.modes.includes(m) ? newMcpServer.modes = newMcpServer.modes.filter(v => v !== m) : newMcpServer.modes.push(m)"
+                                :class="newMcpServer.modes.includes(m) ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary'"
+                                class="flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors capitalize" x-text="m"></button>
+                        </template>
+                    </div>
+                </div>
+                <button type="button" @click="submitMcpServer()" :disabled="mcpServerAdding || !newMcpServer.name.trim()"
+                    :class="mcpServerAdding || !newMcpServer.name.trim() ? 'bg-claude-border cursor-not-allowed' : 'bg-claude-accent hover:bg-claude-accent-hover'"
+                    class="w-full py-2 text-white text-sm font-medium rounded-lg transition-colors">
+                    <span x-show="!mcpServerAdding" x-text="mcpServerEditMode === 'add' ? '추가' : '저장'"></span>
+                    <span x-show="mcpServerAdding" class="flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        도구 발견 중...
+                    </span>
+                </button>
+                <template x-if="mcpServerEditMode === 'edit'">
+                    <button type="button" @click="removeMcpServer(newMcpServer.key, newMcpServer.name)"
+                        class="w-full py-2 text-red-500 text-sm font-medium rounded-lg border border-red-200 hover:bg-red-50 transition-colors">
+                        서버 삭제
+                    </button>
+                </template>
+            </div>
+        </div>
+        <!-- 도구 상세 뷰 (개별 도구 토글) -->
+        <div x-show="attachPanelView === 'tools-detail'" class="p-3">
+            <div class="flex items-center gap-2 mb-3">
+                <button type="button" @click="attachPanelView = 'tools'" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                </button>
+                <span class="text-sm font-medium text-claude-text" x-text="selectedMcpServer?.name || '도구'"></span>
+                <button type="button" @click="toggleAllMcpTools(selectedMcpServer?.name)"
+                    class="ml-auto text-xs px-2 py-1 rounded-lg transition-colors"
+                    :class="mcpTools.filter(t => t.serverName === selectedMcpServer?.name).every(t => t.enabled) ? 'bg-claude-accent/10 text-claude-accent' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'"
+                    x-text="mcpTools.filter(t => t.serverName === selectedMcpServer?.name).every(t => t.enabled) ? '전체 해제' : '전체 선택'">
+                </button>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1">
+                <template x-for="tool in mcpTools.filter(t => t.serverName === selectedMcpServer?.name)" :key="tool.name">
+                    <div @click="toggleMcpTool(tool)" class="flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-claude-sidebar cursor-pointer select-none">
+                        <div class="flex-1 min-w-0">
+                            <div class="text-sm text-claude-text truncate" x-text="tool.name"></div>
+                            <div x-show="tool.description" class="text-xs text-claude-text-secondary truncate" x-text="tool.description"></div>
+                        </div>
+                        <div class="shrink-0 w-10 h-6 rounded-full transition-colors duration-200 relative cursor-pointer"
+                             :class="tool.enabled ? 'bg-claude-accent' : 'bg-claude-border'">
+                            <div class="absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200"
+                                 :class="tool.enabled ? 'left-5' : 'left-1'"></div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+    <!-- 새 프로젝트 모달 -->
+    <div x-cloak x-show="showNewProjectModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showNewProjectModal = false">
+        <div x-show="showNewProjectModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-claude-text mb-4">새 프로젝트 만들기</h3>
+                <p class="text-sm text-claude-text-secondary mb-4">새 작업 폴더를 생성합니다.</p>
+                <form hx-post="/code/new-project" hx-swap="none" @htmx:after-request="if(event.detail.successful) { showNewProjectModal = false; loadProjects(); _selectItem('code', newProjectName); }">
+                    <input type="text" name="project_name" x-model="newProjectName" placeholder="프로젝트 이름 (예: my-app)" class="w-full border border-claude-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text mb-4" autocomplete="off" @keydown.enter.prevent="if(newProjectName.trim()) $el.form.requestSubmit()">
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" @click="showNewProjectModal = false" class="px-4 py-2 text-claude-text-secondary hover:text-claude-text transition-colors">취소</button>
+                        <button type="submit" :disabled="!newProjectName.trim()" :class="newProjectName.trim() ? 'bg-claude-accent hover:bg-claude-accent-hover' : 'bg-claude-border cursor-not-allowed'" class="px-4 py-2 text-white rounded-lg transition-colors">생성</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새 논문 모달 -->
+    <div x-cloak x-show="showNewPaperModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showNewPaperModal = false">
+        <div x-show="showNewPaperModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="p-6">
+                <h3 class="text-lg font-semibold text-claude-text mb-4">새 논문 시작하기</h3>
+                <p class="text-sm text-claude-text-secondary mb-4">새 논문 프로젝트를 생성합니다.</p>
+                <div>
+                    <input type="text" x-model="newPaperName" @input="validatePaperName()" @keydown.enter.prevent="if(newPaperName.trim() && !paperNameError) createNewPaper()" placeholder="논문 이름 (예: my-thesis)" class="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text" :class="paperNameError ? 'border-red-500' : 'border-claude-border'" autocomplete="off">
+                    <p x-show="paperNameError" x-text="paperNameError" class="text-red-500 text-sm mt-1 mb-2"></p>
+                    <p x-show="!paperNameError" class="text-claude-text-secondary text-xs mt-1 mb-4">소문자, 숫자, 하이픈(-)만 사용 가능</p>
+
+                    <!-- 템플릿 선택 -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-claude-text mb-2">템플릿 선택</label>
+                        <select x-model="selectedTemplate" class="w-full border border-claude-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text">
+                            <template x-for="tpl in paperTemplates" :key="tpl.value">
+                                <option :value="tpl.value" x-text="tpl.display_name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="flex gap-3 justify-end">
+                        <button type="button" @click="showNewPaperModal = false; paperNameError = ''" class="px-4 py-2 text-claude-text-secondary hover:text-claude-text transition-colors">취소</button>
+                        <button type="button" @click="createNewPaper()" x-bind:class="(newPaperName.trim() && !paperNameError) ? 'bg-claude-accent hover:bg-claude-accent-hover' : 'bg-claude-border cursor-not-allowed opacity-50'" class="px-4 py-2 text-white rounded-lg transition-colors">생성</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 터미널 모달 -->
+    <div x-cloak x-show="showTerminalModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4" @keydown.escape.window="if(showTerminalModal) closeTerminal()">
+        <div x-show="showTerminalModal" x-transition class="bg-[#1E1E1E] rounded-xl shadow-xl w-full h-full sm:w-[95vw] sm:h-[85vh] sm:max-w-5xl flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2 bg-[#2D2D2D] border-b border-[#404040]">
+                <div class="flex items-center gap-2">
+                    <span x-html="icon('terminal', 'w-5 h-5 text-green-400')"></span>
+                    <span class="text-sm text-gray-300 font-medium">터미널</span>
+                    <span x-show="terminalConnected" class="w-2 h-2 bg-green-400 rounded-full"></span>
+                    <span x-show="!terminalConnected" class="w-2 h-2 bg-red-400 rounded-full"></span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button @click="reconnectTerminal()" class="p-1.5 text-gray-400 hover:text-white rounded transition-colors" title="재연결">
+                        <span x-html="icon('refresh', 'w-4 h-4')"></span>
+                    </button>
+                    <button @click="closeTerminal()" class="p-1.5 text-gray-400 hover:text-white rounded transition-colors" title="닫기">
+                        <span x-html="icon('close', 'w-5 h-5')"></span>
+                    </button>
+                </div>
+            </div>
+            <div id="terminal-container" class="flex-1 overflow-hidden p-1"></div>
+        </div>
+    </div>
+
+    <!-- 파일 내용 모달 -->
+    <div x-cloak x-show="showFileModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="closeFileModal()" @keydown.escape.window="closeFileModal()">
+        <div x-show="showFileModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-claude-border bg-claude-sidebar">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span x-html="fileModalMediaType === 'image' ? icon('image', 'w-5 h-5 text-orange-500 shrink-0') : fileModalMediaType === 'video' ? icon('camera', 'w-5 h-5 text-red-500 shrink-0') : fileModalMediaType === 'pdf' ? icon('file', 'w-5 h-5 text-red-600 shrink-0') : icon('file', 'w-5 h-5 text-claude-text-secondary shrink-0')"></span>
+                    <span class="font-medium text-claude-text truncate" x-text="fileModalPath"></span>
+                </div>
+                <div class="flex items-center gap-1">
+                    <!-- 읽기 모드 버튼들 -->
+                    <template x-if="!fileModalEditing">
+                        <div class="flex items-center gap-1">
+                            <button x-show="(!fileModalMediaType || fileModalMediaType === 'markdown') && fileModalContent && (fileModalMode === 'code' || fileModalMode === 'paper')" @click="startFileEdit()" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors">
+                                <span x-html="icon('edit')"></span>
+                                <span>편집</span>
+                            </button>
+                            <button x-show="!fileModalMediaType || fileModalMediaType === 'markdown'" @click="navigator.clipboard.writeText(fileModalContent); let t = $el.querySelectorAll('span')[1]; t.textContent = '복사됨!'; setTimeout(() => t.textContent = '복사', 2000)" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors">
+                                <span x-html="icon('copy')"></span>
+                                <span>복사</span>
+                            </button>
+                            <button x-show="fileModalMediaType === 'pdf'" @click="if(fileModalMediaUrl) { const a=document.createElement('a'); a.href=fileModalMediaUrl; a.download=fileModalPath.split('/').pop(); document.body.appendChild(a); a.click(); document.body.removeChild(a); }" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors">
+                                <span x-html="icon('download')"></span>
+                            </button>
+                            <button @click="closeFileModal()" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                                <span x-html="icon('close', 'w-5 h-5')"></span>
+                            </button>
+                        </div>
+                    </template>
+                    <!-- 편집 모드 버튼들 -->
+                    <template x-if="fileModalEditing">
+                        <div class="flex items-center gap-1">
+                            <button @click="saveFileEdit()" :disabled="fileModalSaving" class="flex items-center gap-1 px-3 py-1 text-sm text-white bg-claude-accent hover:bg-claude-accent-hover rounded transition-colors disabled:opacity-50">
+                                <span x-text="fileModalSaving ? '저장 중...' : '저장'"></span>
+                            </button>
+                            <button @click="cancelFileEdit()" :disabled="fileModalSaving" class="flex items-center gap-1 px-2 py-1 text-sm text-claude-text-secondary hover:text-claude-text hover:bg-claude-border rounded transition-colors disabled:opacity-50">
+                                <span>취소</span>
+                            </button>
+                            <button @click="closeFileModal()" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                                <span x-html="icon('close', 'w-5 h-5')"></span>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto bg-white">
+                <template x-if="fileModalLoading">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="text-claude-text-secondary">로딩 중...</div>
+                    </div>
+                </template>
+                <template x-if="!fileModalLoading && fileModalMediaType === 'image'">
+                    <div class="flex items-center justify-center p-4 bg-gray-50" style="min-height: 200px;">
+                        <img :src="fileModalMediaUrl" class="max-w-full max-h-[calc(80vh-60px)] object-contain rounded" :alt="fileModalPath">
+                    </div>
+                </template>
+                <template x-if="!fileModalLoading && fileModalMediaType === 'video'">
+                    <div class="flex items-center justify-center p-4 bg-black">
+                        <video :src="fileModalMediaUrl" controls class="max-w-full max-h-[calc(80vh-60px)] rounded" playsinline>
+                            브라우저가 동영상 재생을 지원하지 않습니다.
+                        </video>
+                    </div>
+                </template>
+                <div x-show="!fileModalLoading && fileModalMediaType === 'pdf'" class="w-full flex flex-col" style="height: calc(80vh - 60px);">
+                    <div class="flex items-center justify-center gap-3 py-2 border-b border-claude-border bg-claude-sidebar shrink-0">
+                        <button @click="pdfPage > 1 && renderPdfPage(pdfPage - 1)" :disabled="pdfPage <= 1" :class="pdfPage <= 1 ? 'opacity-30' : 'hover:bg-claude-border'" class="p-1.5 rounded transition-colors">
+                            <span x-html="icon('chevronLeft', 'w-5 h-5')"></span>
+                        </button>
+                        <span class="text-sm text-claude-text"><span x-text="pdfPage"></span> / <span x-text="pdfTotalPages"></span></span>
+                        <button @click="pdfPage < pdfTotalPages && renderPdfPage(pdfPage + 1)" :disabled="pdfPage >= pdfTotalPages" :class="pdfPage >= pdfTotalPages ? 'opacity-30' : 'hover:bg-claude-border'" class="p-1.5 rounded transition-colors">
+                            <span x-html="icon('chevronRight', 'w-5 h-5')"></span>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-auto flex items-start justify-center bg-gray-100 p-2" id="pdf-canvas-container">
+                        <canvas id="pdf-canvas" class="max-w-full shadow-lg"></canvas>
+                    </div>
+                </div>
+                <template x-if="!fileModalLoading && !fileModalEditing && fileModalMediaType === 'markdown'">
+                    <div class="markdown-body p-6 text-claude-text" x-html="renderMarkdown(fileModalContent)" x-init="$nextTick(() => highlightCodeBlocks($el))"></div>
+                </template>
+                <!-- 편집 모드: textarea -->
+                <template x-if="!fileModalLoading && fileModalEditing">
+                    <div class="flex-1 flex flex-col" style="height: calc(80vh - 57px);">
+                        <textarea x-model="fileModalEditContent" @keydown.ctrl.s.prevent="saveFileEdit()" @keydown.meta.s.prevent="saveFileEdit()" class="flex-1 w-full p-4 bg-[#f6f8fa] text-[#24292e] font-mono text-xs leading-relaxed resize-none outline-none border-none" spellcheck="false" :disabled="fileModalSaving"></textarea>
+                    </div>
+                </template>
+                <!-- 읽기 모드: 코드 하이라이팅 -->
+                <template x-if="!fileModalLoading && !fileModalEditing && !fileModalMediaType && fileModalHighlighted">
+                    <div class="file-modal-code overflow-x-auto">
+                        <table class="code-table"><tbody x-html="fileModalHighlighted"></tbody></table>
+                    </div>
+                </template>
+                <template x-if="!fileModalLoading && !fileModalEditing && !fileModalMediaType && !fileModalHighlighted && fileModalContent">
+                    <div class="p-4 text-claude-text-secondary text-sm" x-text="fileModalContent"></div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 명령어 모달 -->
+    <div x-cloak x-show="showCommandModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showCommandModal = false" @keydown.escape.window="showCommandModal = false">
+        <div x-show="showCommandModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+            <div class="px-4 py-3 border-b border-claude-border bg-claude-sidebar flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-claude-text" x-text="commandModalMode === 'create' ? '새 명령어 추가' : '명령어 수정'"></h3>
+                <button @click="showCommandModal = false" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('close', 'w-5 h-5')"></span>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-claude-text mb-1">이름</label>
+                    <input type="text" x-model="newCommandName" placeholder="예: api-keys, server-info" class="w-full border border-claude-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text text-sm" autocomplete="off">
+                    <p class="text-xs text-claude-text-secondary mt-1">영문, 숫자, 하이픈(-), 언더스코어(_)만 사용</p>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-claude-text mb-1">내용</label>
+                    <textarea x-model="newCommandContent" placeholder="채팅창에 삽입될 텍스트를 입력하세요" rows="6" class="w-full border border-claude-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text text-sm resize-none" autocomplete="off"></textarea>
+                    <p class="text-xs text-claude-text-secondary mt-1">API 키, 서버 정보, 자주 사용하는 컨텍스트 등</p>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @click="showCommandModal = false" class="px-4 py-2 text-claude-text-secondary hover:text-claude-text transition-colors">취소</button>
+                    <button type="button" @click="saveCommand()" :disabled="!newCommandName.trim() || !newCommandContent.trim()" :class="newCommandName.trim() && newCommandContent.trim() ? 'bg-claude-accent hover:bg-claude-accent-hover' : 'bg-claude-border cursor-not-allowed'" class="px-4 py-2 text-white rounded-lg transition-colors" x-text="commandModalMode === 'create' ? '추가' : '저장'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 아카이브 모달 -->
+    <div x-cloak x-show="showArchiveModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showArchiveModal = false" @keydown.escape.window="showArchiveModal = false">
+        <div x-show="showArchiveModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-4 py-3 border-b border-claude-border bg-claude-sidebar flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-claude-text">아카이브</h3>
+                <button @click="showArchiveModal = false" class="p-1 text-claude-text-secondary hover:text-claude-text rounded transition-colors">
+                    <span x-html="icon('close', 'w-5 h-5')"></span>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="max-h-64 overflow-y-auto space-y-1">
+                    <template x-if="archivedItems.length === 0">
+                        <div class="text-sm text-claude-text-secondary text-center py-8">아카이브된 항목이 없습니다</div>
+                    </template>
+                    <template x-for="item in archivedItems" :key="item">
+                        <div class="flex items-center gap-2 px-3 py-2.5 rounded-lg hover:bg-claude-sidebar group">
+                            <span x-html="icon(archiveMode === 'code' ? 'folder' : 'file', 'w-4 h-4 text-claude-text-secondary shrink-0')"></span>
+                            <span class="text-sm text-claude-text truncate flex-1" x-text="item"></span>
+                            <button @click="unarchiveItem(item)" class="shrink-0 px-2.5 py-1 text-xs bg-claude-accent/10 text-claude-accent hover:bg-claude-accent/20 rounded-lg transition-colors">
+                                복원
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새로 만들기 모달 -->
+    <div x-cloak x-show="showCreateModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click.self="showCreateModal = false" @keydown.escape.window="showCreateModal = false">
+        <div x-show="showCreateModal" x-transition class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 overflow-hidden">
+            <div class="p-5">
+                <h3 class="text-lg font-semibold text-claude-text mb-4">새로 만들기</h3>
+                <!-- 파일/폴더 탭 -->
+                <div class="flex gap-2 mb-4">
+                    <button @click="createType = 'file'" :class="createType === 'file' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'" class="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                        <span x-html="icon('file', 'w-4 h-4')"></span>
+                        파일
+                    </button>
+                    <button @click="createType = 'folder'" :class="createType === 'folder' ? 'bg-claude-accent text-white' : 'bg-claude-border text-claude-text-secondary hover:text-claude-text'" class="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2">
+                        <span x-html="icon('folder', 'w-4 h-4')"></span>
+                        폴더
+                    </button>
+                </div>
+                <!-- 위치 선택 -->
+                <div class="mb-3">
+                    <label class="text-xs text-claude-text-secondary mb-1 block">위치</label>
+                    <div class="relative">
+                        <input type="text" x-model="createPath" @focus="createDirsOpen = true" @input="filterCreateDirs()" autocomplete="off"
+                            class="w-full border border-claude-accent/50 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text">
+                        <div x-show="createDirsOpen" @click.outside="createDirsOpen = false"
+                            class="absolute left-0 right-0 top-full mt-1 bg-white border border-claude-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-10">
+                            <template x-for="dir in createDirsFiltered" :key="dir">
+                                <button @click="selectCreateDir(dir)" type="button"
+                                    :class="createPath === dir ? 'bg-claude-text-secondary text-white' : 'hover:bg-claude-sidebar text-claude-text'"
+                                    class="w-full text-left px-3 py-2 text-sm transition-colors" x-text="dir"></button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <!-- 이름 입력 -->
+                <div class="mb-4">
+                    <input type="text" x-model="createName" :placeholder="createType === 'file' ? '파일명 (예: index.html)' : '폴더명 (예: components)'" autocomplete="off"
+                        @keydown.enter.prevent="if(createName.trim()) submitCreateItem()"
+                        class="w-full border border-claude-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-claude-accent bg-claude-input-bg text-claude-text">
+                </div>
+                <!-- 버튼 -->
+                <div class="flex gap-3 justify-end">
+                    <button type="button" @click="showCreateModal = false" class="px-4 py-2 text-claude-text-secondary hover:text-claude-text transition-colors text-sm">취소</button>
+                    <button type="button" @click="submitCreateItem()" :disabled="!createName.trim()" :class="createName.trim() ? 'bg-claude-accent hover:bg-claude-accent-hover' : 'bg-claude-border cursor-not-allowed'" class="px-4 py-2 text-white rounded-lg transition-colors text-sm font-medium">생성</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 컨텍스트 메뉴 (롱프레스) -->
+    <div x-cloak x-show="contextMenu.show"
+        @click.outside="contextMenu.show = false"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 scale-95"
+        x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
+        class="fixed bg-white rounded-xl border border-claude-border shadow-lg z-50 py-1 min-w-[140px] overflow-hidden"
+        :style="`top: ${contextMenu.y}px; left: ${contextMenu.x}px;`">
+        <template x-if="contextMenu.type === 'command'">
+            <button @click="openEditCommandModal(contextMenu.target); contextMenu.show = false"
+                class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                <span x-html="icon('edit', 'w-4 h-4')"></span>
+                수정
+            </button>
+        </template>
+        <template x-if="contextMenu.type === 'project'">
+            <div>
+                <button @click="contextMenuRename()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('edit', 'w-4 h-4')"></span>
+                    이름 변경
+                </button>
+                <button @click="contextMenuClone()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('copy', 'w-4 h-4')"></span>
+                    복제
+                </button>
+                <button @click="contextMenuArchive()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('folder', 'w-4 h-4')"></span>
+                    아카이브
+                </button>
+            </div>
+        </template>
+        <template x-if="contextMenu.type === 'paper'">
+            <div>
+                <button @click="contextMenuOpenPdf()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('file', 'w-4 h-4')"></span>
+                    PDF 보기
+                </button>
+                <button @click="contextMenuRename()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('edit', 'w-4 h-4')"></span>
+                    이름 변경
+                </button>
+                <button @click="contextMenuClone()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('copy', 'w-4 h-4')"></span>
+                    복제
+                </button>
+                <button @click="contextMenuArchive()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('folder', 'w-4 h-4')"></span>
+                    아카이브
+                </button>
+            </div>
+        </template>
+        <template x-if="contextMenu.type === 'file'">
+            <div>
+                <button @click="contextMenuCopyPath()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('copy', 'w-4 h-4')"></span>
+                    경로 복사
+                </button>
+                <button @click="contextMenuCopyName()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('file', 'w-4 h-4')"></span>
+                    파일명 복사
+                </button>
+                <button @click="contextMenuDownloadFile()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('download', 'w-4 h-4')"></span>
+                    다운로드
+                </button>
+            </div>
+        </template>
+        <template x-if="contextMenu.type === 'dir'">
+            <div>
+                <button @click="contextMenuCopyPath()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('copy', 'w-4 h-4')"></span>
+                    경로 복사
+                </button>
+                <button @click="contextMenuCopyName()"
+                    class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-claude-text hover:bg-claude-sidebar transition-colors">
+                    <span x-html="icon('folder', 'w-4 h-4')"></span>
+                    폴더명 복사
+                </button>
+            </div>
+        </template>
+        <button @click="contextMenuDelete()"
+            class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+            <span x-html="icon('trash', 'w-4 h-4')"></span>
+            삭제
+        </button>
+    </div>
+
+    <!-- 음성 인식 팝업 -->
+    <div x-cloak x-show="voiceRecording"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         @click.self="cancelVoiceRecording()"
+         class="fixed inset-0 flex items-center justify-center z-50 bg-black/40">
+        <div class="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full mx-4" @click.stop>
+            <!-- 마이크 아이콘 (애니메이션) -->
+            <div class="flex justify-center mb-4">
+                <div class="relative">
+                    <!-- 음파 링 애니메이션 -->
+                    <div class="absolute inset-0 w-20 h-20 bg-claude-accent/30 rounded-full animate-ping"></div>
+                    <div class="absolute inset-0 w-20 h-20 bg-claude-accent/20 rounded-full animate-pulse"></div>
+                    <!-- 메인 아이콘 -->
+                    <div class="relative w-20 h-20 bg-claude-accent rounded-full flex items-center justify-center shadow-lg shadow-claude-accent/25">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 안내 텍스트 -->
+            <p class="text-center text-claude-text-secondary text-sm mb-4" x-show="!submitKeywordDetected">
+                말씀하세요... <span class="text-claude-accent font-medium">"전송해"</span>로 전송
+            </p>
+            <p class="text-center text-green-600 text-sm mb-4 font-medium" x-show="submitKeywordDetected">
+                "전송해" 감지! 3초 후 전송됩니다...
+            </p>
+
+            <!-- 인식된 텍스트 (편집 가능) -->
+            <div class="bg-claude-sidebar rounded-xl p-4 min-h-[80px] max-h-[200px] mb-4 relative">
+                <p class="text-claude-text-secondary text-center py-6" x-show="!voiceText && !voiceInterim">...</p>
+                <div x-show="voiceText || voiceInterim" class="relative">
+                    <textarea
+                        x-model="voiceText"
+                        x-ref="voiceTextarea"
+                        class="w-full bg-transparent text-claude-text resize-none outline-none overflow-y-auto"
+                        style="min-height: 60px; max-height: 160px;"
+                        @input="scrollVoiceTextarea()"
+                    ></textarea>
+                    <span class="text-claude-text-secondary block" x-text="voiceInterim" x-show="voiceInterim"></span>
+                </div>
+            </div>
+
+            <!-- 안내 -->
+            <p class="text-center text-xs text-claude-text-secondary mb-4" x-show="!submitKeywordDetected">
+                "전송해" 말한 후 3초간 침묵하면 전송됩니다
+            </p>
+            <p class="text-center text-xs text-green-500 mb-4" x-show="submitKeywordDetected">
+                말을 계속하면 타이머가 리셋됩니다
+            </p>
+
+            <!-- 버튼 영역 -->
+            <div class="flex gap-3">
+                <button @click="cancelVoiceRecording()"
+                        class="flex-1 py-3 text-claude-text-secondary hover:text-claude-text hover:bg-claude-sidebar rounded-xl transition-colors">
+                    취소해
+                </button>
+                <button @click="autoSubmitVoice()"
+                        :disabled="!voiceText.trim()"
+                        :class="voiceText.trim() ? 'bg-claude-accent text-white hover:bg-claude-accent/90' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+                        class="flex-1 py-3 rounded-xl transition-colors font-medium">
+                    전송해
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 숨겨진 파일 입력 -->
+    <input type="file" id="file-input-camera" accept="image/*" capture="environment" class="hidden" @change="handleFileSelected($event)">
+    <input type="file" id="file-input-image" accept="image/*" class="hidden" @change="handleFileSelected($event)">
+    <input type="file" id="file-input-file" class="hidden" @change="handleFileSelected($event)">
+
+    <!-- Service Worker 등록 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then((reg) => { console.log('SW registered'); reg.update(); })
+                .catch((err) => console.log('SW registration failed:', err));
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</body>
+</html>
