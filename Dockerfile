@@ -15,6 +15,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Chrome (headless, DevTools MCP용)
+RUN curl -fsSL https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -o /tmp/chrome.deb \
+    && apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+    && rm -f /tmp/chrome.deb && rm -rf /var/lib/apt/lists/*
+
 # Claude CLI 설치
 RUN npm install -g @anthropic-ai/claude-code
 
@@ -35,8 +40,12 @@ COPY . .
 RUN mkdir -p /home/ddoli/chat /home/ddoli/workspace /home/ddoli/papers /home/ddoli/paper-templates /home/ddoli/.claude /tmp/ddoli-attachments uploads \
     && chown -R ddoli:ddoli /home/ddoli /tmp/ddoli-attachments /app
 
+# 기본 논문 템플릿 (basic)
+COPY paper-templates/ /home/ddoli/paper-templates/
+RUN chown -R ddoli:ddoli /home/ddoli/paper-templates
+
 USER ddoli
 
 EXPOSE 8000
 
-CMD ["python", "main.py"]
+CMD ["bash", "-c", "google-chrome --headless --disable-gpu --no-sandbox --remote-debugging-port=9222 --remote-debugging-address=127.0.0.1 & python main.py"]
