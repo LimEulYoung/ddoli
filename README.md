@@ -48,25 +48,6 @@ Open `http://<server-IP>:8000` in your browser.
 | Chrome Headless | DevTools MCP connection |
 | Node.js 22 | Claude CLI & MCP stdio server |
 
-## Common Commands
-
-```bash
-# Start
-docker compose up -d
-
-# Stop
-docker compose down
-
-# View logs
-docker compose logs -f app
-
-# Update to latest version
-docker compose pull && docker compose up -d
-
-# Full reset (delete DB and volumes)
-docker compose down -v
-```
-
 ## Volumes
 
 | Volume | Path | Purpose |
