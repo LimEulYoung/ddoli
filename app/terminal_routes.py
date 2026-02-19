@@ -88,33 +88,19 @@ async def websocket_terminal(ws: WebSocket):
     await ws.accept()
 
     session_id = str(uuid.uuid4())[:8]
-    child_pid = None
     master_fd = None
 
     try:
-        # 로컬 PTY 생성
-        child_pid, master_fd = pty.openpty()
-        # fork하여 자식 프로세스에서 셸 실행
-        pid = os.fork()
+        # PTY + fork (pty.fork가 master/slave 설정을 올바르게 처리)
+        pid, master_fd = pty.fork()
         if pid == 0:
-            # 자식 프로세스
-            os.close(master_fd)
-            os.setsid()
-            # slave PTY를 stdin/stdout/stderr로 설정
-            os.dup2(child_pid, 0)
-            os.dup2(child_pid, 1)
-            os.dup2(child_pid, 2)
-            if child_pid > 2:
-                os.close(child_pid)
-            # 환경변수 설정
+            # 자식 프로세스 — 셸 실행
             env = os.environ.copy()
             env["TERM"] = "xterm-256color"
             shell = os.environ.get("SHELL", "/bin/bash")
             os.execve(shell, [shell, "--login"], env)
         else:
             # 부모 프로세스
-            os.close(child_pid)  # slave fd 닫기
-
             # 세션 등록
             terminal_sessions[session_id] = {
                 "pid": pid,
